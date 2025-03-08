@@ -5,27 +5,26 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-type ClientData = {
+interface ClientData {
   id: number;
   name: string;
-};
+}
 
-type TaskData = {
-  id: number;
-  title: string;
-  description?: string;
-  status: string;
-  client_id: number;
-  assigned_to_id: number;
-  due_date: string;
-};
-
-type UserData = {
+interface UserData {
   id: number;
   username: string;
-};
+}
+
+interface TaskData {
+  id: number;
+  title: string;
+  status: string;
+  client: string;
+  assigned_to: string;
+  due_date: string;
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function AdminPanel() {
   const { user } = useAuthStore();
@@ -110,7 +109,7 @@ export default function AdminPanel() {
           status: newTask.status,
           client_id: Number(newTask.client_id),
           assigned_to_id: Number(newTask.assigned_to_id),
-          due_date: newTask.due_date, // Ensure this is in the correct format
+          due_date: newTask.due_date,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -129,7 +128,7 @@ export default function AdminPanel() {
       await axios.put(
         `${API_URL}/tasks/${editingTaskId}`,
         {
-          assigned_to_id: editingTask.assigned_to_id ?? null,
+          assigned_to_id: editingTask.assigned_to ?? null,
           due_date: editingTask.due_date ?? null,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -210,64 +209,59 @@ export default function AdminPanel() {
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
-              const clientName = clients.find((client) => client.id === task.client_id)?.name || "Cliente no encontrado";
-              const assignedUserName = users.find((user) => user.id === task.assigned_to_id)?.username || "Usuario no encontrado";
-
-              return (
-                <tr key={task.id} className="hover:bg-gray-50">
-                  <td className="border border-black p-2">{task.title}</td>
-                  <td className="border border-black p-2">{task.status}</td>
-                  <td className="border border-black p-2">{clientName}</td>
-                  <td className="border border-black p-2">
-                    {editingTaskId === task.id ? (
-                      <select
-                        value={editingTask.assigned_to_id ?? task.assigned_to_id}
-                        onChange={(e) => setEditingTask({ ...editingTask, assigned_to_id: Number(e.target.value) })}
-                        className="border p-1 text-black"
-                      >
-                        {users.map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.username}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <>
-                        {assignedUserName}
-                        <button onClick={() => setEditingTaskId(task.id)} className="ml-2 text-blue-600">
-                          Cambiar
-                        </button>
-                      </>
-                    )}
-                  </td>
-                  <td className="border border-black p-2">
-                    {editingTaskId === task.id ? (
-                      <input
-                        type="date"
-                        value={editingTask.due_date ?? ""}
-                        onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
-                        className="border p-1 text-black"
-                      />
-                    ) : (
-                      <>
-                        {task.due_date}
-                        <button onClick={() => setEditingTaskId(task.id)} className="ml-2 text-blue-600">
-                          Cambiar
-                        </button>
-                      </>
-                    )}
-                  </td>
-                  <td className="border border-black p-2">
-                    {editingTaskId === task.id && (
-                      <button onClick={handleUpdateTask} className="bg-blue-800 text-white px-2 py-1 rounded">
-                        Guardar Cambios
+            {tasks.map((task) => (
+              <tr key={task.id} className="hover:bg-gray-50">
+                <td className="border border-black p-2">{task.title}</td>
+                <td className="border border-black p-2">{task.status}</td>
+                <td className="border border-black p-2">{task.client}</td>
+                <td className="border border-black p-2">
+                  {editingTaskId === task.id ? (
+                    <select
+                      value={editingTask.assigned_to ?? task.assigned_to}
+                      onChange={(e) => setEditingTask({ ...editingTask, assigned_to: e.target.value })}
+                      className="border p-1 text-black"
+                    >
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.username}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      {task.assigned_to}
+                      <button onClick={() => setEditingTaskId(task.id)} className="ml-2 text-blue-600">
+                        Cambiar
                       </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+                    </>
+                  )}
+                </td>
+                <td className="border border-black p-2">
+                  {editingTaskId === task.id ? (
+                    <input
+                      type="date"
+                      value={editingTask.due_date ?? ""}
+                      onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
+                      className="border p-1 text-black"
+                    />
+                  ) : (
+                    <>
+                      {task.due_date ? new Date(task.due_date).toLocaleDateString() : "Sin fecha"}
+                      <button onClick={() => setEditingTaskId(task.id)} className="ml-2 text-blue-600">
+                        Cambiar
+                      </button>
+                    </>
+                  )}
+                </td>
+                <td className="border border-black p-2">
+                  {editingTaskId === task.id && (
+                    <button onClick={handleUpdateTask} className="bg-blue-800 text-white px-2 py-1 rounded">
+                      Guardar Cambios
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
