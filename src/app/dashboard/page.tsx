@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
+import { addDays, subYears } from "date-fns";
 
 // Tipo de datos del reporte y tareas
 type ReportData = {
@@ -30,8 +31,8 @@ export default function Dashboard() {
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(subYears(new Date(), 1));
+  const [endDate, setEndDate] = useState(addDays(new Date(), 1));
 
   useEffect(() => {
     if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
@@ -152,7 +153,7 @@ export default function Dashboard() {
         <h2 className="text-lg font-semibold mb-3">Tareas Actuales</h2>
         <table className="w-full  border border-black rounded-lg overflow-hidden ">
           <thead>
-            <tr className="bg-blue-700 text-white">
+            <tr className="bg-[#4901ce] text-white">
               <th className=" border border-black p-2 text-left">Título</th>
               <th className=" border border-black p-2 text-left">Estado</th>
               <th className=" border border-black p-2 text-left">Cliente</th>

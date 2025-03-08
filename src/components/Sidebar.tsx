@@ -29,6 +29,13 @@ export default function Sidebar() {
         >
           Dashboard
         </button>)}
+        {user && ['admin', 'socio', 'senior'].includes(user.role) && (
+        <button
+          onClick={() => router.push("/dashboard/workspace")}
+          className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
+        >
+          Panel de Administración
+        </button>)}
         {/* Add more buttons here as needed */}
       </nav>
     </aside>
