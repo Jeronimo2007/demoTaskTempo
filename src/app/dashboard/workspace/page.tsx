@@ -147,10 +147,10 @@ export default function AdminPanel() {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4 text-black">Panel de Administración</h1>
 
-      {/* Sección de Crear Tareas */}
-      <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+      {/* Sección combinada de Crear Tareas y Lista de Tareas */}
+      <div className="bg-gray text-black p-6 rounded-lg shadow-lg">
         <h2 className="text-lg font-semibold mb-3">Crear Nueva Tarea</h2>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <input
             type="text"
             placeholder="Título"
@@ -192,10 +192,7 @@ export default function AdminPanel() {
             Crear Tarea
           </button>
         </div>
-      </div>
 
-      {/* Sección de Lista de Tareas */}
-      <div className="bg-white p-4 rounded-lg shadow-lg text-black">
         <h2 className="text-lg font-semibold mb-3">Lista de Tareas</h2>
         <table className="w-full border border-black rounded-lg overflow-hidden">
           <thead className="bg-gray-100">
