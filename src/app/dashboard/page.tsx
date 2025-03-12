@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../../store/useAuthStore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { LineChart, Line, Legend } from "recharts";
@@ -42,24 +42,14 @@ export default function Dashboard() {
   const [endDate, setEndDate] = useState(addDays(new Date(), 1));
   const [timeEntries, setTimeEntries] = useState<TimeEntryData[]>([]);
 
-  useEffect(() => {
-    if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
-      router.push("/");
-    } else {
-      fetchReportData();
-      fetchTasks();
-      fetchTimeEntries();
-    }
-  }, [user, router, startDate, endDate]);
-
-  const getToken = () => {
+  const getToken = useCallback(() => {
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("token="))
       ?.split("=")[1] || "";
-  };
+  }, []);
 
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     try {
       const token = getToken();
       if (!token) {
@@ -88,9 +78,9 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error al obtener los datos del reporte:", error);
     }
-  };
+  }, [getToken, startDate, endDate]);
 
-  const fetchTimeEntries = async () => {
+  const fetchTimeEntries = useCallback(async () => {
     try {
       const token = getToken();
       if (!token) {
@@ -110,7 +100,7 @@ export default function Dashboard() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const formattedEntries = response.data.map((entry: any) => ({
+      const formattedEntries = response.data.map((entry: TimeEntryData) => ({
         date: entry.date,
         client: entry.client,
         hours: entry.hours,
@@ -121,9 +111,9 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error al obtener los registros de tiempo:", error);
     }
-  };
+  }, [getToken, startDate, endDate]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       const token = getToken();
       if (!token) {
@@ -135,7 +125,7 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const formattedTasks = response.data.map((task: any) => ({
+      const formattedTasks = response.data.map((task: TaskData) => ({
         id: task.id,
         title: task.title,
         status: task.status,
@@ -147,7 +137,17 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error al obtener las tareas:", error);
     }
-  };
+  }, [getToken]);
+
+  useEffect(() => {
+    if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
+      router.push("/");
+    } else {
+      fetchReportData();
+      fetchTasks();
+      fetchTimeEntries();
+    }
+  }, [user, router, fetchReportData, fetchTasks, fetchTimeEntries]);
 
   if (!user) return <p>Cargando...</p>;
 
