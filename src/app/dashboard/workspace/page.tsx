@@ -7,6 +7,7 @@ import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave, faTrash } from "@fortawesome/free-solid-svg-icons";
 import ClientSection from "@/components/ClientSection"; 
+import ReportDownload from "@/components/ReportDownload";
 
 type ClientData = {
   id: number;
@@ -304,6 +305,8 @@ export default function AdminPanel() {
           </tbody>
         </table>
       </div>
+
+      <ReportDownload clients={clients} />
     </div>
   );
 }
