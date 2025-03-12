@@ -212,7 +212,13 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold mb-3">Evolución de Horas Trabajadas</h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart>
-              <XAxis dataKey="date" />
+              <XAxis
+                dataKey="date"
+                domain={[format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")]}
+                tickFormatter={(tick) => format(new Date(tick), "yyyy-MM-dd")}
+                interval={Math.floor(filteredTimeEntries.length / 4)}
+                type="category"
+              />
               <YAxis />
               <Tooltip />
               <Legend />
