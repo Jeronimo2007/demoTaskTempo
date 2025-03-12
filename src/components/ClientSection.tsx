@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -16,18 +16,14 @@ export default function ClientSection() {
   const [editingClientId, setEditingClientId] = useState<number | null>(null);
   const [editingClient, setEditingClient] = useState<Partial<ClientData>>({});
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
-
-  const getToken = () => {
+  const getToken = useCallback(() => {
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("token="))
       ?.split("=")[1] || "";
-  };
+  }, []);
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       const token = getToken();
       const response = await axios.get(`${API_URL}/clients/get_clients_admin`, {
@@ -37,7 +33,11 @@ export default function ClientSection() {
     } catch (error) {
       console.error("Error al obtener los clientes:", error);
     }
-  };
+  }, [getToken]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
 
   const handleCreateClient = async () => {
     try {

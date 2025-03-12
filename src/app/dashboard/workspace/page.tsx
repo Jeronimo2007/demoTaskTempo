@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSave, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -49,24 +49,14 @@ export default function AdminPanel() {
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<Partial<TaskData>>({});
 
-  useEffect(() => {
-    if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
-      router.push("/");
-    } else {
-      fetchClients(); // Still need this for the task dropdown
-      fetchTasks();
-      fetchUsers();
-    }
-  }, [user, router]);
-
-  const getToken = () => {
+  const getToken = useCallback(() => {
     return document.cookie
       .split("; ")
       .find((row) => row.startsWith("token="))
       ?.split("=")[1] || "";
-  };
+  }, []);
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       const token = getToken();
       const response = await axios.get(`${API_URL}/clients/get_clients_admin`, {
@@ -76,9 +66,9 @@ export default function AdminPanel() {
     } catch (error) {
       console.error("Error al obtener los clientes:", error);
     }
-  };
+  }, [getToken]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       const token = getToken();
       const response = await axios.get(`${API_URL}/tasks/get_task`, {
@@ -88,9 +78,9 @@ export default function AdminPanel() {
     } catch (error) {
       console.error("Error al obtener las tareas:", error);
     }
-  };
+  }, [getToken]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = getToken();
       const response = await axios.get(`${API_URL}/users/get_all_users`, {
@@ -100,7 +90,17 @@ export default function AdminPanel() {
     } catch (error) {
       console.error("Error al obtener los usuarios:", error);
     }
-  };
+  }, [getToken]);
+
+  useEffect(() => {
+    if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
+      router.push("/");
+    } else {
+      fetchClients();
+      fetchTasks();
+      fetchUsers();
+    }
+  }, [user, router, fetchClients, fetchTasks, fetchUsers]);
 
   const handleCreateTask = async () => {
     try {
