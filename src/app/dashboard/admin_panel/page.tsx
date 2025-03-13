@@ -12,6 +12,7 @@ import ReportDownload from "@/components/ReportDownload";
 type ClientData = {
   id: number;
   name: string;
+  color: string; 
 };
 
 type TaskData = {
@@ -36,7 +37,7 @@ export default function AdminPanel() {
 
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [users, setUsers] = useState<UserData[]>([]);
-  const [clients, setClients] = useState<ClientData[]>([]); // Keep this for task creation
+  const [clients, setClients] = useState<ClientData[]>([]); 
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",

@@ -10,7 +10,7 @@ export default function Sidebar() {
   console.log("Rendering Sidebar, user:", user); 
 
   return (
-    <aside className="h-screen w-64 bg-gray-900 text-white flex flex-col p-4">
+    <aside className="min-h-screen w-64 bg-gray-900 text-white flex flex-col p-4">
       <div className="mb-6 mt-6 ml-5">
         {user ? (
           <h1 className="text-xl font-bold text-white">{user.username}</h1> 
@@ -31,11 +31,17 @@ export default function Sidebar() {
         </button>)}
         {user && ['admin', 'socio', 'senior'].includes(user.role) && (
         <button
-          onClick={() => router.push("/dashboard/workspace")}
+          onClick={() => router.push("/dashboard/admin_panel")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
         >
           Panel de Administración
         </button>)}
+        <button
+          onClick={() => router.push("/dashboard/admin_panel/lawspace")}
+          className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
+        >
+          Espacio de Trabajo
+        </button>
         {/* Add more buttons here as needed */}
       </nav>
     </aside>

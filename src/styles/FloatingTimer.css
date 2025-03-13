@@ -1,0 +1,139 @@
+.floating-timer {
+  position: fixed;
+  width: 300px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  border-left: 5px solid;
+  user-select: none;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+  overflow: hidden;
+}
+
+.floating-timer.dragging {
+  cursor: grabbing;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02);
+}
+
+.floating-timer.minimized {
+  width: 200px;
+  height: auto;
+}
+
+.timer-header {
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.timer-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.minimize-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.minimize-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.timer-content {
+  padding: 15px;
+}
+
+.task-selector {
+  margin-bottom: 15px;
+}
+
+.task-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: white;
+}
+
+.timer-display {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 15px 0;
+  font-family: monospace;
+  color: #333;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #eee;
+}
+
+.timer-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.start-btn, .pause-btn, .stop-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.2s;
+}
+
+.start-btn {
+  background-color: #22c55e;
+  color: white;
+}
+
+.start-btn:hover {
+  background-color: #16a34a;
+}
+
+.start-btn:disabled {
+  background-color: #a1a1aa;
+  cursor: not-allowed;
+}
+
+.pause-btn {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.pause-btn:hover {
+  background-color: #d97706;
+}
+
+.stop-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.stop-btn:hover {
+  background-color: #dc2626;
+}

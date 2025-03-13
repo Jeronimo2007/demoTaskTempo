@@ -11,7 +11,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { addDays, subYears } from "date-fns";
 
-// Tipo de datos del reporte y tareas
+
 type ReportData = {
   Cliente: string;
   "Total Horas": number;
