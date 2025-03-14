@@ -77,6 +77,13 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
     setError(null);
   };
 
+  // Función para ajustar a la zona horaria de Bogotá (UTC-5)
+  const adjustToBogotaTimezone = (date: Date): Date => {
+    // Crear un string ISO con la fecha ajustada a Bogotá (UTC-5)
+    const bogotaDate = moment(date).format('YYYY-MM-DDTHH:mm:ss.SSS-05:00');
+    return new Date(bogotaDate);
+  };
+
   // Handler para crear una nueva entrada de tiempo
   const handleCreateTimeEntry = async (data: { taskId: number, start: Date, end: Date }) => {
     if (onTimeEntryCreate) {
@@ -84,10 +91,14 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
       setError(null);
       
       try {
+        // Ajustar las fechas a la zona horaria de Bogotá
+        const bogotaStartTime = adjustToBogotaTimezone(data.start);
+        const bogotaEndTime = adjustToBogotaTimezone(data.end);
+        
         await onTimeEntryCreate({
           taskId: data.taskId,
-          start_time: data.start,
-          end_time: data.end
+          start_time: bogotaStartTime,
+          end_time: bogotaEndTime
         });
         
         // Cerrar el modal después de crear con éxito

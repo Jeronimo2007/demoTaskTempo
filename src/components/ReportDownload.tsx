@@ -58,7 +58,7 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
 
   return (
     <div className="p-4 bg-white shadow-lg rounded-lg mt-6">
-      <h2 className="text-lg font-semibold mb-3">Download Reports</h2>
+      <h2 className="text-lg font-semibold mb-3">Descargar Reportes</h2>
       <div className="mb-4">
         <div className="flex space-x-4">
           <DatePicker

@@ -96,7 +96,7 @@ const Workspace: React.FC = () => {
         // Unauthorized, token might be expired
         router.push('/login');
       } else {
-        setError('Unable to load tasks. Please try again later.');
+        setError('No se pudieron cargar las tareas. Por favor, inténtalo más tarde.');
       }
     } finally {
       setIsLoading(false);
@@ -152,7 +152,7 @@ const Workspace: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching time entries:', error);
-      setError('Failed to load time entries from server');
+      setError('Error al cargar los registros de tiempo del servidor');
     } finally {
       setIsLoadingEntries(false);
     }
@@ -179,7 +179,7 @@ const Workspace: React.FC = () => {
       }
     } catch (error) {
       console.error('Error saving time entry:', error);
-      setError('Failed to save time entry to server');
+      setError('Error al guardar el registro de tiempo en el servidor');
       throw error; // Re-throw the error so the modal can handle it
     }
   };
@@ -194,7 +194,7 @@ const Workspace: React.FC = () => {
 
   return (
     <div className="p-4 space-y-6 text-black">
-      <h1 className="text-2xl font-bold mb-4">Lawyer Workspace</h1>
+      <h1 className="text-2xl font-bold mb-4">Espacio de Trabajo</h1>
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -204,12 +204,12 @@ const Workspace: React.FC = () => {
 
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-3">
-          Tasks {!hasElevatedPermissions() && "Assigned to You"}
-          {hasElevatedPermissions() && " (All)"}
+          Tareas {!hasElevatedPermissions() && "Asignadas a Ti"}
+          {hasElevatedPermissions() && " (Todas)"}
         </h2>
         {tasks.length === 0 ? (
           <div className="text-gray-500 p-4 text-center">
-            No tasks available. {!hasElevatedPermissions() && "Contact a senior lawyer or partner to get tasks assigned."}
+            No hay tareas disponibles. {!hasElevatedPermissions() && "Contacta a un abogado senior o socio para que te asignen tareas."}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -221,10 +221,10 @@ const Workspace: React.FC = () => {
             >
               <h3 className="font-medium text-lg">{task.title}</h3>
               <div className="mt-2 text-sm text-gray-600">
-                <p><span className="font-medium">Status:</span> {task.status}</p>
-                <p><span className="font-medium">Due Date:</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}</p>
-                <p><span className="font-medium">Client:</span> {task.client}</p>
-                <p><span className="font-medium">Assigned To:</span> {task.assigned_to}</p>
+                <p><span className="font-medium">Estado:</span> {task.status}</p>
+                <p><span className="font-medium">Fecha de Vencimiento:</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Sin fecha'}</p>
+                <p><span className="font-medium">Cliente:</span> {task.client}</p>
+                <p><span className="font-medium">Asignado a:</span> {task.assigned_to}</p>
               </div>
             </div>
           ))}
@@ -235,8 +235,8 @@ const Workspace: React.FC = () => {
       {/* Calendar showing time entries from API */}
       <div>
         <h2 className="text-xl font-semibold mb-3">
-          Time Entries {!hasElevatedPermissions() && "for Your Tasks"}
-          {hasElevatedPermissions() && " (All)"}
+          Registros de Tiempo {!hasElevatedPermissions() && "de Tus Tareas"}
+          {hasElevatedPermissions() && " (Todos)"}
         </h2>
         <TimeEntryCalendar 
           apiTimeEntries={timeEntries} 
