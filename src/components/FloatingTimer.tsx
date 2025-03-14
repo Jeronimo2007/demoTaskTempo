@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlay, FaPause, FaStop, FaSave } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
 
@@ -68,7 +68,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
     }
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  // Using useCallback to memoize the event handler
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging && timerRef.current) {
       const newX = e.clientX - dragOffset.x;
       const newY = e.clientY - dragOffset.y;
@@ -82,7 +83,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         y: Math.max(0, Math.min(newY, maxY))
       });
     }
-  };
+  }, [isDragging, dragOffset.x, dragOffset.y, timerRef]);
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -102,7 +103,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragOffset.x, dragOffset.y]);
+  }, [isDragging, handleMouseMove]);
 
   // Timer control functions
   const handleStart = () => {

@@ -55,38 +55,8 @@ const Workspace: React.FC = () => {
     return user && ELEVATED_ROLES.includes(user.role.toLowerCase());
   }, [user]);
 
-  // Check authentication and fetch data on component mount
-  useEffect(() => {
-    const checkAuthAndFetchData = async () => {
-      const token = getToken();
-      
-      if (!token) {
-        // No token found, redirect to login
-        router.push('/login');
-        return;
-      }
-      
-      // If token exists, make sure we have user data
-      if (!user) {
-        try {
-          const userData = await getUserData(token);
-          setUser(userData, token);
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-          router.push('/login');
-          return;
-        }
-      }
-      
-      // If we have token and user, proceed to fetch data
-      fetchData(token);
-    };
-    
-    checkAuthAndFetchData();
-  }, [getToken, router, user, setUser]);
-
   // Fetch tasks data
-  const fetchData = async (token: string) => {
+  const fetchData = useCallback(async (token: string) => {
     setIsLoading(true);
     try {
       const response = await axios.get(`${API_URL}/tasks/get_task`, {
@@ -94,7 +64,7 @@ const Workspace: React.FC = () => {
       });
 
       // Assign colors to tasks based on their title
-      let tasksWithColors = response.data.map((task: any) => {
+      let tasksWithColors = response.data.map((task: Task) => {
         // Generate a color based on the task title
         const hash = task.title.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
         const hue = hash % 360;
@@ -131,10 +101,41 @@ const Workspace: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, hasElevatedPermissions, user]);
+
+  // Check authentication and fetch data on component mount
+  useEffect(() => {
+    const checkAuthAndFetchData = async () => {
+      const token = getToken();
+      
+      if (!token) {
+        // No token found, redirect to login
+        router.push('/login');
+        return;
+      }
+      
+      // If token exists, make sure we have user data
+      if (!user) {
+        try {
+          const userData = await getUserData(token);
+          setUser(userData, token);
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          router.push('/login');
+          return;
+        }
+      }
+      
+      // If we have token and user, proceed to fetch data
+      fetchData(token);
+    };
+    
+    checkAuthAndFetchData();
+  }, [getToken, router, user, setUser, fetchData]);
+
 
   // Fetch time entries from API
-  const fetchTimeEntries = async (userTasks = tasks) => {
+  const fetchTimeEntries = useCallback(async (userTasks = tasks) => {
     setIsLoadingEntries(true);
     try {
       const entries = await timeEntryService.getAllTimeEntries();
@@ -155,25 +156,23 @@ const Workspace: React.FC = () => {
     } finally {
       setIsLoadingEntries(false);
     }
-  };
+  }, [tasks, user, hasElevatedPermissions]);
 
   // Handle refresh of time entries (e.g. from Calendar component)
   const handleRefreshTimeEntries = useCallback(() => {
     fetchTimeEntries();
-  }, [tasks]);
+  }, [fetchTimeEntries]);
 
   // Handle creation of new time entries
   const handleTimeEntryCreate = async (entry: TimeEntry) => {
     try {
       if (entry.start_time && entry.end_time) {
-        const response = await timeEntryService.create({
+        await timeEntryService.create({
           task_id: entry.taskId,
           start_time: entry.start_time.toISOString(),
           end_time: entry.end_time.toISOString()
         });
         
-        // Refresh time entries after creating a new one
-        fetchTimeEntries();
         // Refresh time entries after creating a new one
         fetchTimeEntries();
         return; // Return void to match the expected type
