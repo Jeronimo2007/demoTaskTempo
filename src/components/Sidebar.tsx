@@ -24,24 +24,25 @@ export default function Sidebar() {
       <nav className="flex flex-col space-y-2">
       {user && ['admin', 'socio', 'senior'].includes(user.role) && (
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push("/lawspace/dashboard")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
         >
           Dashboard
         </button>)}
         {user && ['admin', 'socio', 'senior'].includes(user.role) && (
         <button
-          onClick={() => router.push("/dashboard/admin_panel")}
+          onClick={() => router.push("/lawspace/dashboard/admin_panel")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
         >
           Panel de Administración
         </button>)}
+        {user && ['admin', 'socio', 'senior','consultor','junior','auxiliar'].includes(user.role) && (
         <button
-          onClick={() => router.push("/dashboard/admin_panel/lawspace")}
+          onClick={() => router.push("/lawspace")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
         >
           Espacio de Trabajo
-        </button>
+        </button>)}
         {/* Add more buttons here as needed */}
       </nav>
     </aside>

@@ -16,7 +16,7 @@ export default function LoginPage() {
     try {
       const data = await loginUser(username, password);
       setUser({ id: data.user_id, username: data.username, role: data.role}, data.access_token);
-      router.push("/dashboard");
+      router.push("/lawspace");
     } catch (err) {
       console.error("Login error:", err);
       setError("Usuario o contraseña incorrectos");

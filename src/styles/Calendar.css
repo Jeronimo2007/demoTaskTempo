@@ -60,6 +60,18 @@
   background-color: #94a3b8;
 }
 
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Estilos específicos para la vista de mes */
 .rbc-month-view {
   border: 1px solid #e2e8f0;
@@ -146,4 +158,63 @@
 .calendar-container .rbc-calendar {
   min-height: 600px;
   height: 100% !important;
+}
+
+/* Nuevos estilos para mejorar la funcionalidad de selección */
+
+/* Estilo para el área que está siendo seleccionada */
+.rbc-slot-selecting {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Estilo para la selección completa */
+.rbc-selecting {
+  cursor: grabbing !important;
+}
+
+/* Estilo para el área seleccionada */
+.rbc-selected {
+  background-color: rgba(59, 130, 246, 0.2) !important; 
+}
+
+/* Estilo para la selección en la vista de mes */
+.rbc-selected-cell {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+}
+
+/* Mejorar el efecto hover en las celdas seleccionables */
+.rbc-day-bg:hover,
+.rbc-time-slot:hover {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+  cursor: pointer;
+}
+
+/* Estilo para el borde de la selección */
+.rbc-slot-selection {
+  border: 1px dashed #3b82f6 !important;
+  background-color: rgba(59, 130, 246, 0.18) !important;
+  color: #1e40af !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px 4px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Estilo para el texto en la selección */
+.rbc-slot-selection .rbc-status {
+  font-size: 0.8rem !important;
+}
+
+/* Mejora del contraste para áreas seleccionables */
+.rbc-day-slot {
+  position: relative;
+  transition: background-color 0.15s ease;
+}
+
+/* Efecto de pulsación visual */
+.rbc-day-slot:active {
+  background-color: rgba(59, 130, 246, 0.08) !important;
 }
