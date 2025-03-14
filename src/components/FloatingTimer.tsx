@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { FaPlay, FaPause, FaStop, FaTrash, FaSave } from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaSave } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
 
 type Task = {
@@ -21,7 +20,6 @@ type TimeEntry = {
   duration?: number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface FloatingTimerProps {
   tasks: Task[];
@@ -104,7 +102,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, dragOffset.x, dragOffset.y]);
 
   // Timer control functions
   const handleStart = () => {

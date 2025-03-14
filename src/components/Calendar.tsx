@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, momentLocalizer, SlotInfo } from 'react-big-calendar';
+import { Calendar, momentLocalizer, SlotInfo, Event, EventPropGetter, View } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../styles/Calendar.css';
@@ -8,7 +8,6 @@ import { FaSync } from 'react-icons/fa';
 import TimeEntryModal from './TimeEntryModal';
 
 const localizer = momentLocalizer(moment);
-
 
 type Task = {
   id: number;
@@ -25,7 +24,27 @@ interface TimeEntryCalendarProps {
   tasks: Task[];
   isLoading?: boolean;
   onRefresh?: () => void;
-  onTimeEntryCreate?: (entry: any) => Promise<void>;
+  onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date }) => Promise<void>;
+}
+
+// Tipo personalizado para nuestros eventos de calendario
+interface CalendarEvent extends Event {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  color: string;
+  resource: {
+    task?: Task;
+    entry: TimeEntryResponse;
+  };
+}
+
+// Tipo para toolbar
+interface ToolbarProps {
+  date: Date;
+  onNavigate: (action: 'PREV' | 'NEXT' | 'TODAY') => void;
+  onView: (view: View) => void;
 }
 
 const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({ 
@@ -89,7 +108,7 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   };
 
   // Convert time entries from API to calendar events
-  const getEvents = () => {
+  const getEvents = (): CalendarEvent[] => {
     return apiTimeEntries.map((entry) => {
       const task = tasks.find((task) => task.id === entry.task_id);
       return {
@@ -104,7 +123,7 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   };
 
   // Customize event appearance
-  const eventPropGetter = (event: any) => {
+  const eventPropGetter: EventPropGetter<CalendarEvent> = (event) => {
     return {
       style: {
         backgroundColor: event.color,
@@ -120,7 +139,7 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   };
 
   // Custom event component to show more details
-  const EventComponent = ({ event }: { event: any }) => {
+  const EventComponent = ({ event }: { event: CalendarEvent }) => {
     const task = event.resource.task;
     const entry = event.resource.entry;
     // Calculate duration in seconds
@@ -149,7 +168,7 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   };
 
   // Custom toolbar component
-  const CustomToolbar = (toolbar: any) => {
+  const CustomToolbar = (toolbar: ToolbarProps) => {
     const goToBack = () => {
       toolbar.onNavigate('PREV');
     };
