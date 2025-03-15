@@ -169,8 +169,8 @@ const Workspace: React.FC = () => {
       if (entry.start_time && entry.end_time) {
         await timeEntryService.create({
           task_id: entry.taskId,
-          start_time: entry.start_time.toISOString(),
-          end_time: entry.end_time.toISOString()
+          start_time: entry.start_time,
+          end_time: entry.end_time
         });
         
         // Refresh time entries after creating a new one

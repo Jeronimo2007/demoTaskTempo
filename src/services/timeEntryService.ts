@@ -29,13 +29,34 @@ const getToken = () => {
         ?.split("=")[1] || "";
 };
 
+// Función que preserva la zona horaria local al formatear fechas para la API
+// En lugar de usar toISOString() que convierte a UTC, usamos un formato que preserva la zona horaria
+const formatDateForAPI = (date: Date): string => {
+    // Obtener el offset de la zona horaria en minutos
+    const tzOffset = date.getTimezoneOffset();
+    
+    // Crear una nueva fecha ajustada para preservar la hora local al convertirla a ISO
+    const adjustedDate = new Date(date.getTime() - tzOffset * 60000);
+    
+    // Formatear como ISO pero eliminar la 'Z' al final para evitar la interpretación UTC
+    return adjustedDate.toISOString().slice(0, -1);
+};
+
 export const timeEntryService = {
     // Create a new time entry
-    create: async (entry: TimeEntryCreate): Promise<TimeEntryResponse> => {
+    create: async (entry: { task_id: number; start_time: Date | string; end_time: Date | string }): Promise<TimeEntryResponse> => {
         const token = getToken();
+        
+        // Formateamos las fechas en formato ISO para enviar al backend
+        const formattedEntry: TimeEntryCreate = {
+            task_id: entry.task_id,
+            start_time: entry.start_time instanceof Date ? formatDateForAPI(entry.start_time) : entry.start_time,
+            end_time: entry.end_time instanceof Date ? formatDateForAPI(entry.end_time) : entry.end_time
+        };
+        
         const response = await axios.post(
             `${API_URL}/timeEntry/create`,
-            entry,
+            formattedEntry,
             { headers: { Authorization: `Bearer ${token}` } }
         );
         return response.data;
@@ -62,11 +83,21 @@ export const timeEntryService = {
     },
 
     // Update a time entry
-    updateTimeEntry: async (entryId: number, updates: TimeEntryUpdate): Promise<TimeEntryResponse> => {
+    updateTimeEntry: async (entryId: number, updates: { start_time?: Date | string; end_time?: Date | string }): Promise<TimeEntryResponse> => {
         const token = getToken();
+        
+        // Formateamos las fechas si existen
+        const formattedUpdates: TimeEntryUpdate = {};
+        if (updates.start_time) {
+            formattedUpdates.start_time = updates.start_time instanceof Date ? formatDateForAPI(updates.start_time) : updates.start_time;
+        }
+        if (updates.end_time) {
+            formattedUpdates.end_time = updates.end_time instanceof Date ? formatDateForAPI(updates.end_time) : updates.end_time;
+        }
+        
         const response = await axios.put(
             `${API_URL}/timeEntry/update/${entryId}`,
-            updates,
+            formattedUpdates,
             { headers: { Authorization: `Bearer ${token}` } }
         );
         return response.data;
