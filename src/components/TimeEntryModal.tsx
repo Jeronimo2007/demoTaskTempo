@@ -5,11 +5,10 @@ import { FaTimes, FaSave } from 'react-icons/fa';
 type Task = {
   id: number;
   title: string;
-  status: string;
-  due_date: string;
+  status?: string;
+  due_date?: string;
   client: string;
-  assigned_to: string;
-  color: string;
+  color?: string;
 };
 
 interface TimeEntryModalProps {

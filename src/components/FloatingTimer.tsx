@@ -8,8 +8,6 @@ type Task = {
   status: string;
   due_date: string;
   client: string;
-  assigned_to: string;
-  color: string;
 };
 
 type TimeEntry = {
@@ -43,6 +41,9 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   
   const timerRef = useRef<HTMLDivElement>(null);
   const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) : null;
+  
+  // Default timer color
+  const timerColor = '#3B82F6'; // Blue color
 
 
   // Timer effect
@@ -225,8 +226,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       style={{ 
         left: `${position.x}px`, 
         top: `${position.y}px`,
-        backgroundColor: selectedTask?.color || 'white',
-        borderColor: selectedTask?.color || '#e2e8f0',
+        backgroundColor: timerColor,
+        borderColor: timerColor,
         borderWidth: '2px',
         borderStyle: 'solid',
         transition: isDragging ? 'none' : 'all 0.2s ease',
@@ -236,7 +237,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       <div 
         className="p-2 flex justify-between items-center border-b"
         onMouseDown={handleMouseDown}
-        style={{ backgroundColor: selectedTask?.color || 'white' }}
+        style={{ backgroundColor: timerColor }}
       >
         <span className="font-medium truncate text-white">
           {selectedTask ? selectedTask.title : 'Select a task'}

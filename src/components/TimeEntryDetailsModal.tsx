@@ -3,15 +3,14 @@ import moment from 'moment';
 import { FaTimes, FaTrash } from 'react-icons/fa';
 import { TimeEntryResponse } from '@/services/timeEntryService';
 
-type Task = {
+interface Task {
   id: number;
   title: string;
-  status: string;
-  due_date: string;
+  status?: string;
+  due_date?: string;
   client: string;
-  assigned_to: string;
-  color: string;
-};
+  color?: string;
+}
 
 interface TimeEntryDetailsModalProps {
   isOpen: boolean;

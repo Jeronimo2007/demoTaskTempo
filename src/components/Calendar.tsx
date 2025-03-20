@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, momentLocalizer, SlotInfo, Event, EventPropGetter, View } from 'react-big-calendar';
 import moment from 'moment';
+import 'moment/locale/es'; // Importar la localización española de moment
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import '../styles/Calendar.css';
 import { TimeEntryResponse, timeEntryService } from '@/services/timeEntryService';
@@ -8,6 +9,9 @@ import { FaSync } from 'react-icons/fa';
 import TimeEntryModal from './TimeEntryModal';
 import TimeEntryDetailsModal from '@/components/TimeEntryDetailsModal';
 import { useAuthStore } from '@/store/useAuthStore';
+
+// Configurar moment para usar español
+moment.locale('es');
 
 const localizer = momentLocalizer(moment);
 
@@ -17,8 +21,6 @@ type Task = {
   status: string;
   due_date: string;
   client: string;
-  assigned_to: string;
-  color: string;
 };
 
 interface TimeEntryCalendarProps {
@@ -28,10 +30,12 @@ interface TimeEntryCalendarProps {
   onRefresh?: () => void;
   onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date }) => Promise<void>;
   // Props for user information
-  userMap?: Record<number, string>; // Map of user_id to name
+  userMap?: Record<number, string> | ((userId: number) => string); // Map of user_id to name or function to get name
   currentUserId?: number; // ID of the currently logged-in user
   // Optional prop to fetch users if userMap is not provided
   fetchUsers?: () => Promise<Record<number, string>>;
+  // New prop for user color mapping
+  userColorMap?: Record<number, string>;
 }
 
 // Tipo personalizado para nuestros eventos de calendario
@@ -44,6 +48,7 @@ interface CalendarEvent extends Event {
   resource: {
     task?: Task;
     entry: TimeEntryResponse;
+    userId: number; // Añadimos el userId explícitamente para facilitar el acceso
   };
 }
 
@@ -62,9 +67,9 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   onTimeEntryCreate,
   userMap: initialUserMap = {},
   currentUserId,
-  fetchUsers
+  fetchUsers,
+  userColorMap = {} // Default to empty object if not provided
 }) => {
-  const [view, setView] = useState<'month' | 'week'>('week');
   // Estado para el modal de creación de time entry
   const [showModal, setShowModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{start: Date, end: Date} | null>(null);
@@ -76,7 +81,9 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   
   // Estado para el mapa de usuarios (para mantener nombres)
-  const [userMap, setUserMap] = useState<Record<number, string>>(initialUserMap);
+  const [userMap, setUserMap] = useState<Record<number, string>>(
+    typeof initialUserMap === 'function' ? {} : initialUserMap
+  );
   const [loadingUsers, setLoadingUsers] = useState(false);
   
   // Obtener el usuario actual del store de autenticación
@@ -107,7 +114,12 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   }, [fetchUsers, userMap]);
 
   // Función auxiliar para obtener nombre de usuario
-  const getUserName = (userId: number): string => {
+  const getUserName = useCallback((userId: number): string => {
+    // Si se proporcionó una función para obtener nombres de usuario, úsala
+    if (typeof initialUserMap === 'function') {
+      return initialUserMap(userId);
+    }
+    
     // Si es el usuario actual y tenemos su información en authUser
     if (userId === effectiveCurrentUserId && authUser) {
       return authUser.username || `Usuario ${userId}`;
@@ -120,38 +132,38 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
     
     // Fallback a ID de usuario
     return `Usuario ${userId}`;
-  };
+  }, [effectiveCurrentUserId, authUser, userMap, initialUserMap]);
 
   // Handler para selección de slot en el calendario
-  const handleSelectSlot = (slotInfo: SlotInfo) => {
+  const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
     setSelectedSlot({
       start: slotInfo.start,
       end: slotInfo.end
     });
     setShowModal(true);
-  };
+  }, []);
 
   // Handler para cerrar el modal
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowModal(false);
     setSelectedSlot(null);
     setError(null);
-  };
+  }, []);
 
   // Handler para cerrar el modal de detalles
-  const handleCloseDetailsModal = () => {
+  const handleCloseDetailsModal = useCallback(() => {
     setShowDetailsModal(false);
     setSelectedEvent(null);
-  };
+  }, []);
 
   // Handler for selecting an event (time entry)
-  const handleSelectEvent = (event: CalendarEvent) => {
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
     setSelectedEvent(event);
     setShowDetailsModal(true);
-  };
+  }, []);
 
   // Handler for deleting a time entry
-  const handleDeleteTimeEntry = async (entryId: number) => {
+  const handleDeleteTimeEntry = useCallback(async (entryId: number) => {
     try {
       await timeEntryService.deleteTimeEntry(entryId);
       
@@ -163,11 +175,10 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
       console.error("Error deleting time entry:", error);
       throw error;
     }
-  };
-
+  }, [onRefresh]);
 
   // Handler para crear una nueva entrada de tiempo
-  const handleCreateTimeEntry = async (data: { taskId: number, start: Date, end: Date }) => {
+  const handleCreateTimeEntry = useCallback(async (data: { taskId: number, start: Date, end: Date }) => {
     if (onTimeEntryCreate) {
       setCreating(true);
       setError(null);
@@ -194,38 +205,58 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         setCreating(false);
       }
     }
-  };
+  }, [onTimeEntryCreate, onRefresh]);
 
   // Función para parsear correctamente las fechas de strings ISO a objetos Date
   // preservando la zona horaria local
-  const parseISOtoLocalDate = (isoString: string): Date => {
+  const parseISOtoLocalDate = useCallback((isoString: string): Date => {
     // Parsear la fecha ISO a objeto Date
-    const date = new Date(isoString);
-    return date;
-  };
+    return new Date(isoString);
+  }, []);
+
+  // Para depuración - mostrar el userColorMap en la consola
+  useEffect(() => {
+    console.log('userColorMap:', userColorMap);
+  }, [userColorMap]);
 
   // Convert time entries from API to calendar events
-  const getEvents = (): CalendarEvent[] => {
+  const events = useMemo(() => {
     return apiTimeEntries.map((entry) => {
       const task = tasks.find((task) => task.id === entry.task_id);
+      
+      // Use user color from userColorMap if available, otherwise use default color
+      const userId = entry.user_id;
+      const eventColor = userColorMap[userId] || '#cccccc';
+      
+      // Para depuración
+      console.log(`Entry ${entry.id} - User ${userId} - Color: ${eventColor}`);
+      
       return {
         id: `api-${entry.id}`,
         title: task ? task.title : 'Tarea sin asignar',
         start: parseISOtoLocalDate(entry.start_time),
         end: parseISOtoLocalDate(entry.end_time),
-        color: task ? task.color : '#cccccc',
-        resource: { task, entry }
+        color: eventColor,
+        resource: { 
+          task, 
+          entry,
+          userId // Añadimos el userId explícitamente
+        }
       };
     });
-  };
+  }, [apiTimeEntries, tasks, parseISOtoLocalDate, userColorMap]);
 
   // Customize event appearance
-  const eventPropGetter: EventPropGetter<CalendarEvent> = (event) => {
-    const isCurrentUserEntry = event.resource.entry.user_id === effectiveCurrentUserId;
+  const eventPropGetter: EventPropGetter<CalendarEvent> = useCallback((event) => {
+    const isCurrentUserEntry = event.resource.userId === effectiveCurrentUserId;
+    
+    // Para depuración
+    console.log(`Rendering event ${event.id} with color ${event.color}`);
     
     return {
+      className: '',
       style: {
-        backgroundColor: event.color,
+        backgroundColor: event.color || '#cccccc',
         borderRadius: '4px',
         opacity: isCurrentUserEntry ? 1 : 0.8, // Highlight current user's entries
         color: '#fff',
@@ -236,10 +267,10 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         cursor: 'pointer',
       },
     };
-  };
+  }, [effectiveCurrentUserId]);
 
   // Custom event component to show more details
-  const EventComponent = ({ event }: { event: CalendarEvent }) => {
+  const EventComponent = useCallback(({ event }: { event: CalendarEvent }) => {
     const task = event.resource.task;
     const entry = event.resource.entry;
     // Calculate duration in seconds
@@ -271,30 +302,20 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         </div>
       </div>
     );
-  };
+  }, [getUserName]);
 
-  // Custom toolbar component
-  const CustomToolbar = (toolbar: ToolbarProps) => {
+  // Custom toolbar component - removed month view button
+  const CustomToolbar = useCallback(({ date, onNavigate }: ToolbarProps) => {
     const goToBack = () => {
-      toolbar.onNavigate('PREV');
+      onNavigate('PREV');
     };
 
     const goToNext = () => {
-      toolbar.onNavigate('NEXT');
+      onNavigate('NEXT');
     };
 
     const goToCurrent = () => {
-      toolbar.onNavigate('TODAY');
-    };
-
-    const goToMonth = () => {
-      setView('month');
-      toolbar.onView('month');
-    };
-
-    const goToWeek = () => {
-      setView('week');
-      toolbar.onView('week');
+      onNavigate('TODAY');
     };
 
     const handleRefresh = () => {
@@ -304,9 +325,9 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
     };
 
     const label = () => {
-      const date = moment(toolbar.date);
+      const dateObj = moment(date);
       return (
-        <span><b>{date.format('MMMM')}</b><span> {date.format('YYYY')}</span></span>
+        <span><b>{dateObj.format('MMMM')}</b><span> {dateObj.format('YYYY')}</span></span>
       );
     };
 
@@ -327,17 +348,10 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
           </button>
         </div>
         <div className="toolbar-views">
+          {/* Only week view is available */}
           <button 
             type="button" 
-            onClick={goToMonth} 
-            className={`toolbar-btn ${view === 'month' ? 'active' : ''}`}
-          >
-            Mes
-          </button>
-          <button 
-            type="button" 
-            onClick={goToWeek} 
-            className={`toolbar-btn ${view === 'week' ? 'active' : ''}`}
+            className="toolbar-btn active"
           >
             Semana
           </button>
@@ -354,12 +368,34 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         </div>
       </div>
     );
-  };
+  }, [isLoading, loadingUsers, onRefresh]);
 
-  // Calendar style
-  const calendarStyle = {
-    height: 600
-  };
+  // Definir formatos personalizados para el calendario en español
+  const formats = useMemo(() => ({
+    dayFormat: 'ddd DD', // Formato para los días: Lun 01, Mar 02, etc.
+    dayHeaderFormat: 'dddd DD/MM', // Formato para los encabezados de días: Lunes 01/01
+    dayRangeHeaderFormat: ({ start, end }: { start: Date, end: Date }) => 
+      `${moment(start).format('DD MMM')} - ${moment(end).format('DD MMM')}`,
+    monthHeaderFormat: 'MMMM YYYY', // Formato para el encabezado del mes: Enero 2023
+    weekdayFormat: 'dddd', // Formato para los días de la semana: Lunes, Martes, etc.
+  }), []);
+
+  // Calendar messages
+  const messages = useMemo(() => ({
+    today: 'Hoy',
+    previous: 'Anterior',
+    next: 'Siguiente',
+    week: 'Semana',
+    day: 'Día',
+    date: 'Fecha',
+    time: 'Hora',
+    event: 'Evento',
+    allDay: 'Todo el día',
+    work_week: 'Semana laboral',
+    yesterday: 'Ayer',
+    tomorrow: 'Mañana',
+    noEventsInRange: 'No hay eventos en este rango',
+  }), []);
 
   return (
     <div className="calendar-container">
@@ -372,35 +408,20 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
       
       <Calendar
         localizer={localizer}
-        events={getEvents()}
+        events={events}
         startAccessor="start"
         endAccessor="end"
-        style={calendarStyle}
+        style={{ height: 600 }}
         eventPropGetter={eventPropGetter}
         defaultView="week"
-        view={view}
-        onView={(view) => setView(view as 'week' | 'month')}
-        views={['month', 'week']}
+        view="week" // Force week view
+        views={['week']} // Only week view is available
+        formats={formats} // Aplicar formatos personalizados
         components={{
           toolbar: CustomToolbar,
           event: EventComponent
         }}
-        messages={{
-          today: 'Hoy',
-          previous: 'Anterior',
-          next: 'Siguiente',
-          month: 'Mes',
-          week: 'Semana',
-          day: 'Día',
-          date: 'Fecha',
-          time: 'Hora',
-          event: 'Evento',
-          allDay: 'Todo el día',
-          work_week: 'Semana laboral',
-          yesterday: 'Ayer',
-          tomorrow: 'Mañana',
-          noEventsInRange: 'No hay eventos en este rango',
-        }}
+        messages={messages}
         selectable={true}
         onSelectSlot={handleSelectSlot}
         onSelectEvent={handleSelectEvent}

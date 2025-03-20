@@ -1,18 +1,21 @@
+
 'use client'
 
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useEffect, useState, useCallback } from "react";
+import React from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSave, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faSave, faTrash, faCheck, faTimes } from "@fortawesome/free-solid-svg-icons";
 import ClientSection from "@/components/ClientSection"; 
 import ReportDownload from "@/components/ReportDownload";
 
 type ClientData = {
   id: number;
   name: string;
-  color: string; 
+  color: string;
+  permanent: boolean;
 };
 
 type TaskData = {
@@ -20,7 +23,7 @@ type TaskData = {
   title: string;
   status: string;
   client: string;
-  assigned_to: string;
+  client_id: number;
   due_date: string;
 };
 
@@ -28,6 +31,19 @@ type UserData = {
   id: number;
   username: string;
 };
+
+type ClientSectionProps = {
+  // Existing props here
+  onClientUpdate: () => void; // Add this line to define the prop
+};
+
+// Define task status options with their colors
+const TASK_STATUSES = [
+  { value: "En proceso", color: "bg-yellow-500" },
+  { value: "Finalizado", color: "bg-green-500" },
+  { value: "Cancelado", color: "bg-gray-500" },
+  { value: "Gestionar al cliente", color: "bg-purple-500" }
+];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -43,12 +59,25 @@ export default function AdminPanel() {
     description: "",
     status: "En proceso",
     client_id: "",
-    assigned_to_id: "",
     due_date: "",
   });
 
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<Partial<TaskData>>({});
+  const [clientsUpdated, setClientsUpdated] = useState(0); // Counter to trigger refreshes
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  // Helper function to check if a client is permanent
+  const isClientPermanent = useCallback((clientId: number) => {
+    const client = clients.find(c => c.id === clientId);
+    return client?.permanent || false;
+  }, [clients]);
+
+  // Helper function to get status color
+  const getStatusColor = (status: string) => {
+    const statusObj = TASK_STATUSES.find(s => s.value === status);
+    return statusObj?.color || "bg-gray-300";
+  };
 
   const getToken = useCallback(() => {
     return document.cookie
@@ -93,6 +122,7 @@ export default function AdminPanel() {
     }
   }, [getToken]);
 
+  // This effect runs on initial load and when clientsUpdated changes
   useEffect(() => {
     if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
       router.push("/");
@@ -101,7 +131,13 @@ export default function AdminPanel() {
       fetchTasks();
       fetchUsers();
     }
-  }, [user, router, fetchClients, fetchTasks, fetchUsers]);
+  }, [user, router, fetchClients, fetchTasks, fetchUsers, clientsUpdated]);
+
+  // Function to be passed to ClientSection to notify when clients are updated
+  const handleClientUpdate = useCallback(() => {
+    console.log("Client update detected, refreshing client list...");
+    setClientsUpdated(prev => prev + 1); // Increment to trigger the effect
+  }, []);
 
   const handleCreateTask = async () => {
     try {
@@ -113,15 +149,22 @@ export default function AdminPanel() {
           description: newTask.description,
           status: newTask.status,
           client_id: Number(newTask.client_id),
-          assigned_to_id: Number(newTask.assigned_to_id),
           due_date: newTask.due_date,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setNewTask({ title: "", description: "", status: "En proceso", client_id: "", assigned_to_id: "", due_date: "" });
+      setNewTask({ 
+        title: "", 
+        description: "", 
+        status: "En proceso", 
+        client_id: "", 
+        due_date: "",
+      });
       fetchTasks();
+      setUpdateError(null);
     } catch (error) {
       console.error("Error al crear la tarea:", error);
+      setUpdateError("Error al crear la tarea");
     }
   };
 
@@ -129,51 +172,98 @@ export default function AdminPanel() {
     if (editingTaskId === null) return;
   
     try {
+      setUpdateError(null);
       const token = getToken();
       const taskToUpdate = tasks.find(task => task.id === editingTaskId);
       if (!taskToUpdate) return;
   
+      // Make sure we have all the required fields
+      if (!editingTask.title) {
+        setUpdateError("El título no puede estar vacío");
+        return;
+      }
+  
       const data = {
-        assigned_to_id: Number(editingTask.assigned_to) ?? taskToUpdate.assigned_to,
-        due_date: editingTask.due_date ?? taskToUpdate.due_date,
+        id: editingTaskId, // Make sure to include the task ID
+        title: editingTask.title,
+        status: editingTask.status || taskToUpdate.status,
+        due_date: editingTask.due_date || taskToUpdate.due_date,
       };
   
-      console.log("Updating task with data:", data); // Log the data being sent
+      console.log("Updating task with data:", data);
   
-      await axios.put(
-        `${API_URL}/tasks/${editingTaskId}`,
+      const response = await axios.put(
+        `${API_URL}/tasks/update_task`, // Updated endpoint
         data,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
-      fetchTasks();
+  
+      console.log("Update response:", response.data);
+      
+      await fetchTasks(); // Refresh the task list
       setEditingTaskId(null);
       setEditingTask({});
     } catch (error) {
       console.error("Error al actualizar la tarea:", error);
       if (axios.isAxiosError(error) && error.response) {
-        console.error("Server response:", error.response.data); // Log server response
+        console.error("Server response:", error.response.data);
+        setUpdateError(`Error: ${error.response.data.message || "Error al actualizar la tarea"}`);
+      } else {
+        setUpdateError("Error al actualizar la tarea");
       }
     }
   };
 
+  // Find client ID by client name
+  const getClientIdByName = (clientName: string) => {
+    const client = clients.find(c => c.name === clientName);
+    return client?.id;
+  };
+
   const handleDeleteTask = async (taskId: number) => {
+    // Agregar confirmación antes de eliminar
+    const isConfirmed = window.confirm("¿Está seguro que desea eliminar esta tarea?");
+    
+    // Solo proceder si el usuario confirmó
+    if (!isConfirmed) {
+      return; // Salir de la función si el usuario cancela
+    }
+    
     try {
       const token = getToken();
       await axios.delete(`${API_URL}/tasks/delete/${taskId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setTasks(tasks.filter(task => task.id !== taskId));
+      setUpdateError(null);
     } catch (error) {
       console.error("Error al eliminar la tarea:", error);
+      setUpdateError("Error al eliminar la tarea");
     }
   };
 
   const startEditingTask = (task: TaskData) => {
     setEditingTaskId(task.id);
+    // Make sure to set all fields explicitly to avoid undefined values
     setEditingTask({
-      assigned_to: task.assigned_to || "",
+      title: task.title,
+      status: task.status,
       due_date: task.due_date,
+      client: task.client,
+      client_id: task.client_id,
     });
+    setUpdateError(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingTaskId(null);
+    setEditingTask({});
+    setUpdateError(null);
   };
 
   if (!user) return <p>Cargando...</p>;
@@ -183,12 +273,19 @@ export default function AdminPanel() {
       <h1 className="text-2xl font-bold mb-4 text-black">Panel de Administración</h1>
 
       {/* Sección de Gestión de Clientes */}
-      <ClientSection />
+      <ClientSection onClientUpdate={handleClientUpdate} />
 
       {/* Sección combinada de Crear Tareas y Lista de Tareas */}
       <div className="bg-white text-black p-6 rounded-lg shadow-lg mt-6">
         <h2 className="text-lg font-semibold mb-3">Crear Nueva Tarea</h2>
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        
+        {updateError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {updateError}
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <input
             type="text"
             placeholder="Título"
@@ -208,25 +305,17 @@ export default function AdminPanel() {
               </option>
             ))}
           </select>
-          <select
-            value={newTask.assigned_to_id}
-            onChange={(e) => setNewTask({ ...newTask, assigned_to_id: e.target.value })}
-            className="border p-2 text-black rounded"
-          >
-            <option value="">...</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.username}
-              </option>
-            ))}
-          </select>
           <input
             type="date"
             value={newTask.due_date}
             onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
             className="border p-2 text-black rounded"
           />
-          <button onClick={handleCreateTask} className="bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+          
+          <button 
+            onClick={handleCreateTask} 
+            className="bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition col-span-1 md:col-span-3"
+          >
             Crear Tarea
           </button>
         </div>
@@ -238,71 +327,109 @@ export default function AdminPanel() {
               <th className="border-b border-black p-2 text-left">Título</th>
               <th className="border-b border-black p-2 text-left">Estado</th>
               <th className="border-b border-black p-2 text-left">Cliente</th>
-              <th className="border-b border-black p-2 text-left">Asignado a</th>
               <th className="border-b border-black p-2 text-left">Fecha de Vencimiento</th>
+              <th className="border-b border-black p-2 text-left">Asesoria Permanente</th>
               <th className="border-b border-black p-2 text-left">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => (
-              <tr key={task.id} className="hover:bg-gray-50">
-                <td className="border-b border-black p-2">{task.title}</td>
-                <td className="border-b border-black p-2">{task.status}</td>
-                <td className="border-b border-black p-2">{task.client}</td>
-                <td className="border-b border-black p-2">
-                  {editingTaskId === task.id ? (
-                    <select
-                      value={editingTask.assigned_to ?? ""}
-                      onChange={(e) => setEditingTask({ ...editingTask, assigned_to: e.target.value })}
-                      className="border p-1 text-black rounded"
-                    >
-                      <option value="">...</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.username}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <>
-                      {task.assigned_to}
-                      <button onClick={() => startEditingTask(task)} className="ml-2 text-blue-600 hover:text-blue-800 transition">
-                        Cambiar
-                      </button>
-                    </>
-                  )}
-                </td>
-                <td className="border-b border-black p-2">
-                  {editingTaskId === task.id ? (
-                    <input
-                      type="date"
-                      value={editingTask.due_date ?? ""}
-                      onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
-                      className="border p-1 text-black rounded"
-                    />
-                  ) : (
-                    <>
-                      {task.due_date ? new Date(task.due_date).toLocaleDateString() : "Sin fecha"}
-                      <button onClick={() => startEditingTask(task)} className="ml-2 text-blue-600 hover:text-blue-800 transition">
-                        Cambiar
-                      </button>
-                    </>
-                  )}
-                </td>
-                <td className=" p-2 flex space-x-2">
-                  {editingTaskId === task.id && (
-                    <>
-                      <button onClick={handleUpdateTask} className="bg-blue-800 text-white p-2 rounded hover:bg-blue-700 transition">
-                        <FontAwesomeIcon icon={faSave} />
-                      </button>
-                      <button onClick={() => handleDeleteTask(task.id)} className="bg-red-800 text-white p-2 rounded hover:bg-red-700 transition">
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {tasks.map((task) => {
+              const clientId = task.client_id || getClientIdByName(task.client);
+              const isPermanent = clientId ? isClientPermanent(clientId) : false;
+              
+              return (
+                <tr key={task.id} className="hover:bg-gray-50">
+                  <td className="border-b border-black p-2">
+                    {editingTaskId === task.id ? (
+                      <input
+                        type="text"
+                        value={editingTask.title || ""}
+                        onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                        className="border p-1 text-black rounded w-full"
+                      />
+                    ) : (
+                      task.title
+                    )}
+                  </td>
+                  <td className="border-b border-black p-2">
+                    {editingTaskId === task.id ? (
+                      <select
+                        value={editingTask.status || task.status}
+                        onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value })}
+                        className="border p-1 text-black rounded w-full"
+                      >
+                        {TASK_STATUSES.map((status) => (
+                          <option key={status.value} value={status.value}>
+                            {status.value}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold inline-block text-center text-white ${getStatusColor(task.status)}`}>
+                        {task.status}
+                      </div>
+                    )}
+                  </td>
+                  <td className="border-b border-black p-2">{task.client}</td>
+                  <td className="border-b border-black p-2">
+                    {editingTaskId === task.id ? (
+                      <input
+                        type="date"
+                        value={editingTask.due_date || ""}
+                        onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
+                        className="border p-1 text-black rounded w-full"
+                      />
+                    ) : (
+                      task.due_date ? new Date(task.due_date).toLocaleDateString() : "Sin fecha"
+                    )}
+                  </td>
+                  <td className="border-b border-black p-2">
+                    <div className={`px-3 py-1 rounded-full text-xs font-semibold inline-block text-center ${
+                      isPermanent 
+                        ? "bg-green-500 text-white" 
+                        : "bg-gray-300 text-gray-700"
+                    }`}>
+                      {isPermanent ? "Sí" : "No"}
+                    </div>
+                  </td>
+                  <td className="border-b border-black p-2 flex space-x-2">
+                    {editingTaskId === task.id ? (
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={handleUpdateTask} 
+                          className="bg-blue-800 text-white p-2 rounded hover:bg-blue-700 transition"
+                          title="Guardar cambios"
+                        >
+                          <FontAwesomeIcon icon={faSave} />
+                        </button>
+                        <button 
+                          onClick={cancelEditing} 
+                          className="bg-gray-500 text-white p-2 rounded hover:bg-gray-400 transition"
+                          title="Cancelar edición"
+                        >
+                          <FontAwesomeIcon icon={faTimes} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => startEditingTask(task)} 
+                          className="bg-blue-600 text-white p-2 rounded hover:bg-blue-500 transition"
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteTask(task.id)} 
+                          className="bg-red-800 text-white p-2 rounded hover:bg-red-700 transition"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
