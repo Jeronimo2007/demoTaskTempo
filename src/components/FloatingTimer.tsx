@@ -9,6 +9,7 @@ type TimeEntry = {
   start_time?: Date;
   end_time?: Date;
   duration?: number;
+  description?: string;
 };
 
 
@@ -16,9 +17,10 @@ interface FloatingTimerProps {
   tasks: Task[];
   onTimeEntryCreate: (entry: TimeEntry) => void;
   onEntryCreated?: () => void;
+  className?: string;
 }
 
-const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate, onEntryCreated }) => {
+const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate, onEntryCreated, className }) => {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -31,6 +33,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [description, setDescription] = useState<string>('');
   
   const timerRef = useRef<HTMLDivElement>(null);
   const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) : null;
@@ -110,13 +113,14 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       // Create a new time entry that we'll update later
       const newEntry: TimeEntry = {
         taskId: selectedTaskId,
-        start_time: now
+        start_time: now,
+        description: description
       };
       
       setCurrentTimeEntry(newEntry);
       setErrorMessage(null);
     } else {
-      setErrorMessage("Please select a task first");
+      setErrorMessage("Por favor primero selecciona una tarea");
     }
   };
 
@@ -133,7 +137,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         const finalEntry: TimeEntry = {
           ...currentTimeEntry,
           end_time: now,
-          duration: elapsedTime
+          duration: elapsedTime,
+          description: description // Include the description
         };
         
         try {
@@ -155,6 +160,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           setElapsedTime(0);
           setCurrentTimeEntry(null);
           setStartTime(null);
+          setDescription('');
         }
       } else {
         // Just reset without saving
@@ -174,7 +180,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       // Just update the current time entry state with the elapsed time so far
       setCurrentTimeEntry({
         ...currentTimeEntry,
-        duration: elapsedTime
+        duration: elapsedTime,
+        description: description // Update description in case it changed
       });
     }
   };
@@ -212,10 +219,18 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
     return `${hours}:${minutes}`;
   };
 
+  // Helper function to get client name from task
+  const getClientName = (task: Task): string => {
+    // Try different client name properties that might exist
+    if (task.client_name) return task.client_name;
+    if (task.client) return task.client;
+    return 'Sin cliente';
+  };
+
   return (
     <div 
       ref={timerRef}
-      className={`fixed shadow-lg rounded-lg ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isMinimized ? 'w-48' : 'w-64'}`}
+      className={`fixed shadow-lg rounded-lg ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isMinimized ? 'w-48' : 'w-64'} ${className || ''}`}
       style={{ 
         left: `${position.x}px`, 
         top: `${position.y}px`,
@@ -233,7 +248,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         style={{ backgroundColor: timerColor }}
       >
         <span className="font-medium truncate text-white">
-          {selectedTask ? selectedTask.title : 'Select a task'}
+          {selectedTask ? selectedTask.title : 'Selecciona una tarea'}
         </span>
         <button onClick={toggleMinimize} className="ml-2 text-white hover:text-gray-200">
           {isMinimized ? '↑' : '↓'}
@@ -241,22 +256,32 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       </div>
       
       {!isMinimized && (
-        <div className="p-3 bg-white">
+        <div className="p-3 bg-white text-black">
           <select
             value={selectedTaskId ?? ''}
             onChange={(e) => setSelectedTaskId(Number(e.target.value) || null)}
-            className="w-full border p-2 rounded mb-3"
+            className="w-full border p-2 rounded mb-3 text-black"
             disabled={isRunning || isPaused}
           >
-            <option value="">Select Task</option>
+            <option value="">Seleccionar tarea</option>
             {tasks.map((task) => (
-              <option key={task.id} value={task.id}>
-                {task.title} - Cliente {Number(task.client_id)}
+              <option key={task.id} value={task.id} className="text-black">
+                {task.title} - {getClientName(task)}
               </option>
             ))}
           </select>
           
-          <div className="text-center text-xl font-bold mb-3">
+          {/* Description field */}
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Descripción de la actividad"
+            className="w-full border p-2 rounded mb-3 text-black resize-none"
+            rows={2}
+            disabled={isSaving}
+          />
+          
+          <div className="text-center text-xl font-bold mb-3 text-black">
             {formatTime(elapsedTime)}
           </div>
           
@@ -279,7 +304,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
             </div>
           )}
           
-          <div className="flex justify-between gap-2">
+          <div className="flex flex-col gap-2">
             {!isRunning && !isPaused && !currentTimeEntry && (
               <button 
                 onClick={handleStart} 
@@ -291,29 +316,31 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
             )}
             
             {isPaused && currentTimeEntry && (
-              <div className="flex w-full gap-2">
-                <button 
-                  onClick={handleResume} 
-                  className="bg-green-500 text-white px-4 py-2 rounded flex-1 hover:bg-green-600 transition flex items-center justify-center"
-                  disabled={isSaving}
-                >
-                  <FaPlay className="mr-2" /> Resume
-                </button>
-                <button 
-                  onClick={() => handleStop(true)} 
-                  className="bg-blue-500 text-white px-4 py-2 rounded flex-1 hover:bg-blue-600 transition flex items-center justify-center"
-                  disabled={isSaving}
-                >
-                  <FaSave className="mr-2" /> Save
-                </button>
+              <>
+                <div className="flex w-full gap-2">
+                  <button 
+                    onClick={handleResume} 
+                    className="bg-green-500 text-white px-4 py-2 rounded flex-1 hover:bg-green-600 transition flex items-center justify-center"
+                    disabled={isSaving}
+                  >
+                    <FaPlay className="mr-2" /> Resume
+                  </button>
+                  <button 
+                    onClick={() => handleStop(true)} 
+                    className="bg-blue-500 text-white px-4 py-2 rounded flex-1 hover:bg-blue-600 transition flex items-center justify-center"
+                    disabled={isSaving}
+                  >
+                    <FaSave className="mr-2" /> Save
+                  </button>
+                </div>
                 <button 
                   onClick={handleReset} 
-                  className="bg-red-500 text-white px-4 py-2 rounded flex-1 hover:bg-red-600 transition flex items-center justify-center"
+                  className="bg-red-500 text-white px-4 py-2 rounded w-1/2 mx-auto hover:bg-red-600 transition flex items-center justify-center mt-2"
                   disabled={isSaving}
                 >
                   <VscDebugRestart className="mr-2" /> Reset
                 </button>
-              </div>
+              </>
             )}
             
             {isRunning && (
