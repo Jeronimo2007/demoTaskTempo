@@ -19,6 +19,11 @@ export interface Client {
   permanent?: boolean;
   monthly_limit_hours?: number;
   total_time?: number;
+  nit?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  email?: string;
   // Add other client properties as needed
 }
 
@@ -31,7 +36,36 @@ export interface ClientResponse {
   permanent?: boolean;
   monthly_limit_hours?: number;
   total_time?: number;
+  nit?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  email?: string;
   [key: string]: any;
+}
+
+// Define interfaces for create and update operations
+export interface CreateClientData {
+  name: string;
+  permanent?: boolean;
+  monthly_limit_hours?: number;
+  nit?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  email?: string;
+}
+
+export interface UpdateClientData {
+  id: number;
+  name?: string;
+  permanent?: boolean;
+  monthly_limit_hours?: number;
+  nit?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  email?: string;
 }
 
 // Client cache to avoid redundant API calls - using numbers as keys
@@ -42,6 +76,104 @@ const clientService = {
   clearCache: () => {
     console.log('🧹 Clearing client cache');
     clientCache = {};
+  },
+
+  // Create a new client with all the new fields
+  createClient: async (clientData: CreateClientData): Promise<Client> => {
+    const token = getToken();
+    try {
+      console.log('🔍 Creating new client:', clientData);
+      const response = await axios.post<ClientResponse>(
+        `${API_URL}/clients/create`,
+        clientData,
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.data || !response.data.id) {
+        console.error('❌ Unexpected response format:', response.data);
+        throw new Error('Invalid response from server');
+      }
+      
+      const client = response.data;
+      console.log(`✅ Client created successfully:`, JSON.stringify(client));
+      
+      const name = client.name || client.nombre || client.client_name || `Cliente ${client.id}`;
+      const clientObj: Client = {
+        id: client.id,
+        name: name,
+        permanent: client.permanent,
+        monthly_limit_hours: client.monthly_limit_hours,
+        total_time: client.total_time,
+        nit: client.nit,
+        phone: client.phone,
+        city: client.city,
+        address: client.address,
+        email: client.email
+      };
+      
+      // Update cache with this new client
+      clientCache[client.id] = clientObj;
+      console.log(`💾 Added new client to cache: ID=${client.id}, Name=${name}`);
+      
+      return clientObj;
+    } catch (error) {
+      console.error(`❌ Error creating client:`, error);
+      throw error;
+    }
+  },
+
+  // Update an existing client with all the new fields
+  updateClient: async (clientData: UpdateClientData): Promise<Client> => {
+    const token = getToken();
+    try {
+      console.log(`🔍 Updating client with ID: ${clientData.id}`, clientData);
+      const response = await axios.put<ClientResponse>(
+        `${API_URL}/clients/update/${clientData.id}`,
+        clientData,
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.data || !response.data.id) {
+        console.error('❌ Unexpected response format:', response.data);
+        throw new Error('Invalid response from server');
+      }
+      
+      const client = response.data;
+      console.log(`✅ Client updated successfully:`, JSON.stringify(client));
+      
+      const name = client.name || client.nombre || client.client_name || `Cliente ${client.id}`;
+      const clientObj: Client = {
+        id: client.id,
+        name: name,
+        permanent: client.permanent,
+        monthly_limit_hours: client.monthly_limit_hours,
+        total_time: client.total_time,
+        nit: client.nit,
+        phone: client.phone,
+        city: client.city,
+        address: client.address,
+        email: client.email
+      };
+      
+      // Update cache with this updated client
+      clientCache[client.id] = clientObj;
+      console.log(`💾 Updated client in cache: ID=${client.id}, Name=${name}`);
+      
+      return clientObj;
+    } catch (error) {
+      console.error(`❌ Error updating client with ID ${clientData.id}:`, error);
+      throw error;
+    }
   },
 
   // Get all clients with improved handling of the get_clients_admin endpoint
@@ -81,7 +213,12 @@ const clientService = {
           name: name,
           permanent: client.permanent,
           monthly_limit_hours: client.monthly_limit_hours,
-          total_time: client.total_time
+          total_time: client.total_time,
+          nit: client.nit,
+          phone: client.phone,
+          city: client.city,
+          address: client.address,
+          email: client.email
         };
         
         // Update cache with this client - using number as key
@@ -142,7 +279,12 @@ const clientService = {
         name: name,
         permanent: client.permanent,
         monthly_limit_hours: client.monthly_limit_hours,
-        total_time: client.total_time
+        total_time: client.total_time,
+        nit: client.nit,
+        phone: client.phone,
+        city: client.city,
+        address: client.address,
+        email: client.email
       };
       
       // Update cache with this client
