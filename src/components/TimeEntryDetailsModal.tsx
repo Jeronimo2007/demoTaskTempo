@@ -92,6 +92,15 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
             <p><span className="font-medium">Inicio:</span> {formatDate(timeEntry.start_time)}</p>
             <p><span className="font-medium">Fin:</span> {formatDate(timeEntry.end_time)}</p>
             <p><span className="font-medium">Duración:</span> {durationString}</p>
+            {/* Display description if available */}
+            {timeEntry.description && (
+              <div className="mt-2">
+                <p className="font-medium">Descripción:</p>
+                <p className="mt-1 p-2 bg-gray-50 rounded border border-gray-200">
+                  {timeEntry.description}
+                </p>
+              </div>
+            )}
             {creatorName && (
               <p><span className="font-medium">Creado por:</span> {creatorName}</p>
             )}

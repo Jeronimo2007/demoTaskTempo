@@ -8,6 +8,7 @@ export interface AssignedTask {
 }
 
 export interface Task {
+  client: string;
   id: number;
   title: string;
   status: string;
@@ -28,11 +29,31 @@ const getToken = (): string => {
 
 export const taskService = {
   // Get all tasks
-  getAllTasks: async (): Promise<Task[]> => {
+  getAllTasks: async (start_date?: Date, end_date?: Date): Promise<Task[]> => {
     const token = getToken();
     try {
+      // Build the URL with query parameters for start_date and end_date if provided
+      let url = `${API_URL}/tasks/get_task`;
+      const params = new URLSearchParams();
+      
+      // Add start_date and end_date to params if they exist
+      if (start_date) {
+        params.append('start_date', start_date.toISOString());
+      }
+      if (end_date) {
+        params.append('end_date', end_date.toISOString());
+      }
+      
+      // Append params to URL if any exist
+      const queryString = params.toString();
+      if (queryString) {
+        url = `${url}?${queryString}`;
+      }
+      
+      console.log('Fetching tasks with URL:', url);
+      
       const response = await axios.get<Task[]>(
-        `${API_URL}/tasks/get_task`,
+        url,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       // Ensure client_id is always a number

@@ -6,11 +6,13 @@ export interface TimeEntryCreate {
     task_id: number;
     start_time: string;
     end_time: string;
+    description: string;
 }
 
 export interface TimeEntryUpdate {
     start_time?: string;
     end_time?: string;
+    description?: string;
 }
 
 export interface TimeEntryResponse {
@@ -20,12 +22,9 @@ export interface TimeEntryResponse {
     start_time: string;
     end_time: string;
     duration: number;
+    description?: string;
 }
 
-export interface DateRangeRequest {
-    start_date: string;
-    end_date: string;
-}
 
 const getToken = () => {
     return document.cookie
@@ -34,29 +33,34 @@ const getToken = () => {
         ?.split("=")[1] || "";
 };
 
-// Función que preserva la zona horaria local al formatear fechas para la API
-// En lugar de usar toISOString() que convierte a UTC, usamos un formato que preserva la zona horaria
+// Updated date formatting function to match backend expected format
 const formatDateForAPI = (date: Date): string => {
-    // Obtener el offset de la zona horaria en minutos
-    const tzOffset = date.getTimezoneOffset();
-    
-    // Crear una nueva fecha ajustada para preservar la hora local al convertirla a ISO
-    const adjustedDate = new Date(date.getTime() - tzOffset * 60000);
-    
-    // Formatear como ISO pero eliminar la 'Z' al final para evitar la interpretación UTC
-    return adjustedDate.toISOString().slice(0, -1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 };
 
 export const timeEntryService = {
     // Create a new time entry
-    create: async (entry: { task_id: number; start_time: Date | string; end_time: Date | string }): Promise<TimeEntryResponse> => {
+    create: async (entry: { 
+      task_id: number; 
+      start_time: Date | string; 
+      end_time: Date | string; 
+      description: string 
+    }): Promise<TimeEntryResponse> => {
         const token = getToken();
         
         // Formateamos las fechas en formato ISO para enviar al backend
         const formattedEntry: TimeEntryCreate = {
             task_id: entry.task_id,
             start_time: entry.start_time instanceof Date ? formatDateForAPI(entry.start_time) : entry.start_time,
-            end_time: entry.end_time instanceof Date ? formatDateForAPI(entry.end_time) : entry.end_time
+            end_time: entry.end_time instanceof Date ? formatDateForAPI(entry.end_time) : entry.end_time,
+            description: entry.description
         };
         
         const response = await axios.post(
@@ -81,22 +85,33 @@ export const timeEntryService = {
     getTimeEntriesByDateRange: async (startDate: Date, endDate: Date): Promise<TimeEntryResponse[]> => {
         const token = getToken();
 
-        // Format dates for API
-        const formattedRequest: DateRangeRequest = {
-            start_date: formatDateForAPI(startDate),
-            end_date: formatDateForAPI(endDate)
-        };
+        // Format dates for API in the expected format
+        const start_date = formatDateForAPI(startDate);
+        const end_date = formatDateForAPI(endDate);
 
-        console.log(`📅 Fetching time entries from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+        console.log(`📅 Fetching time entries from ${start_date} to ${end_date}`);
         
-        const response = await axios.post(
-            `${API_URL}/timeEntry/get_all_time_entries`,
-            formattedRequest,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        console.log(`✅ Received ${response.data.length} time entries for the date range`);
-        return response.data;
+        try {
+            const response = await axios.post(
+                `${API_URL}/timeEntry/get_all_time_entries`,
+                {
+                    start_date: start_date,
+                    end_date: end_date
+                },
+                {
+                    headers: { 
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            
+            console.log(`✅ Received ${response.data.length} time entries for the date range`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching time entries:', error);
+            throw error;
+        }
     },
 
     // Get a specific time entry
@@ -110,7 +125,7 @@ export const timeEntryService = {
     },
 
     // Update a time entry
-    updateTimeEntry: async (entryId: number, updates: { start_time?: Date | string; end_time?: Date | string }): Promise<TimeEntryResponse> => {
+    updateTimeEntry: async (entryId: number, updates: { start_time?: Date | string; end_time?: Date | string; description?: string }): Promise<TimeEntryResponse> => {
         const token = getToken();
         
         // Formateamos las fechas si existen
@@ -120,6 +135,9 @@ export const timeEntryService = {
         }
         if (updates.end_time) {
             formattedUpdates.end_time = updates.end_time instanceof Date ? formatDateForAPI(updates.end_time) : updates.end_time;
+        }
+        if (updates.description !== undefined) {
+            formattedUpdates.description = updates.description;
         }
         
         const response = await axios.put(

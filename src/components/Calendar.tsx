@@ -20,8 +20,8 @@ interface TimeEntryCalendarProps {
   apiTimeEntries: TimeEntryResponse[];
   tasks: Task[];
   isLoading?: boolean;
-  onRefresh?: () => void;
-  onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date }) => Promise<any>; // Changed from Promise<void> to Promise<any>
+  onRefresh?: (startDate?: Date, endDate?: Date) => void;
+  onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date; description: string }) => Promise<any>; // Updated to include description
   // Props for user information
   userMap?: Record<number, string> | ((userId: number) => string); // Map of user_id to name or function to get name
   currentUserId?: number; // ID of the currently logged-in user
@@ -231,7 +231,7 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
   }, [currentDate, fetchTimeEntriesForWeek]);
 
   // Handler for navigating to a different date
-  const handleNavigate = useCallback((action: 'PREV' | 'NEXT' | 'TODAY') => {
+  const handleNavigate = useCallback(async (action: 'PREV' | 'NEXT' | 'TODAY') => {
     let newDate;
 
     switch (action) {
@@ -250,10 +250,44 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
 
     console.log(`🔄 Navigating to ${action}: ${moment(newDate).format('DD/MM/YYYY')}`);
     setCurrentDate(newDate);
+
+    // Calculate the start and end dates for the new week
+    const startDate = moment(newDate).startOf('week').toDate();
+    const endDate = moment(newDate).endOf('week').toDate();
+
+    console.log(`📅 New week range: ${moment(startDate).format('DD/MM/YYYY')} to ${moment(endDate).format('DD/MM/YYYY')}`);
+
+    // Call onRefresh with the new date range if provided
+    if (onRefresh) {
+      setLoadingEntries(true);
+      try {
+        await onRefresh(startDate, endDate);
+      } catch (error) {
+        console.error('Error refreshing data for new week:', error);
+      } finally {
+        setLoadingEntries(false);
+      }
+    }
+  }, [currentDate, onRefresh]);
+  
+  // Function to get the current date range based on the calendar view
+  const getCurrentDateRange = useCallback(() => {
+    // Use the current calendar date as reference
+    const date = currentDate;
+    
+    // Calculate start of the week (Sunday)
+    const startDate = moment(date).startOf('week').toDate();
+    
+    // Calculate end of the week (Saturday)
+    const endDate = moment(date).endOf('week').toDate();
+    
+    console.log(`📅 Current date range: ${moment(startDate).format('DD/MM/YYYY')} to ${moment(endDate).format('DD/MM/YYYY')}`);
+    
+    return { startDate, endDate };
   }, [currentDate]);
 
   // Handler para crear una nueva entrada de tiempo
-  const handleCreateTimeEntry = useCallback(async (data: { taskId: number, start: Date, end: Date }) => {
+  const handleCreateTimeEntry = useCallback(async (data: { taskId: number, start: Date, end: Date, description: string }) => {
     if (onTimeEntryCreate) {
       setCreating(true);
       setError(null);
@@ -262,7 +296,8 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
         await onTimeEntryCreate({
           taskId: data.taskId,
           start_time: data.start,
-          end_time: data.end
+          end_time: data.end,
+          description: data.description // Pass the description to the API
         });
         
         // Cerrar el modal después de crear con éxito
@@ -364,6 +399,13 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
     // Get client name from task if available
     const clientName = task?.client || task?.client_name || (task?.client_id ? `Cliente ${task.client_id}` : 'Sin cliente');
     
+    // Create a short preview of description if available
+    const descriptionPreview = entry.description 
+      ? entry.description.length > 30 
+        ? `${entry.description.substring(0, 30)}...` 
+        : entry.description
+      : null;
+    
     return (
       <div>
         <strong>{event.title}</strong>
@@ -373,6 +415,11 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
         <div style={{ fontSize: '0.8em' }}>
           {durationString}
         </div>
+        {descriptionPreview && (
+          <div style={{ fontSize: '0.8em', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            "{descriptionPreview}"
+          </div>
+        )}
         <div style={{ fontSize: '0.8em', fontStyle: 'italic' }}>
           Por: {creator}
         </div>
@@ -380,7 +427,7 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
     );
   }, [getUserName]);
 
-  // Custom toolbar component - removed month view button
+  // Custom toolbar component with loading state
   const CustomToolbar = useCallback(({ date }: ToolbarProps) => {
     const goToBack = () => {
       handleNavigate('PREV');
@@ -394,22 +441,24 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
       handleNavigate('TODAY');
     };
 
-    const handleRefresh = () => {
+    const handleRefresh = async () => {
+      if (!onRefresh) return;
+
       console.log('🔄 Calendar refresh button clicked');
-      
-      // Refresh current week entries
-      setLoadingUsers(true);
-      
-      fetchTimeEntriesForWeek(currentDate)
-        .then(() => {
-          console.log('✅ Calendar refresh completed');
-        })
-        .catch(err => {
-          console.error('❌ Error during calendar refresh:', err);
-        })
-        .finally(() => {
-          setLoadingUsers(false);
-        });
+      setLoadingEntries(true);
+
+      try {
+        // Get the current week's date range
+        const startDate = moment(currentDate).startOf('week').toDate();
+        const endDate = moment(currentDate).endOf('week').toDate();
+        
+        await onRefresh(startDate, endDate);
+        console.log('✅ Calendar refresh completed');
+      } catch (err) {
+        console.error('❌ Error during calendar refresh:', err);
+      } finally {
+        setLoadingEntries(false);
+      }
     };
 
     const label = () => {
@@ -425,13 +474,28 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
           {label()}
         </div>
         <div className="toolbar-nav">
-          <button type="button" onClick={goToBack} className="toolbar-btn">
+          <button 
+            type="button" 
+            onClick={goToBack} 
+            className="toolbar-btn"
+            disabled={loadingEntries}
+          >
             &lt;
           </button>
-          <button type="button" onClick={goToCurrent} className="toolbar-btn today-btn">
+          <button 
+            type="button" 
+            onClick={goToCurrent} 
+            className="toolbar-btn today-btn"
+            disabled={loadingEntries}
+          >
             Hoy
           </button>
-          <button type="button" onClick={goToNext} className="toolbar-btn">
+          <button 
+            type="button" 
+            onClick={goToNext} 
+            className="toolbar-btn"
+            disabled={loadingEntries}
+          >
             &gt;
           </button>
         </div>
@@ -456,7 +520,7 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
         </div>
       </div>
     );
-  }, [isLoading, loadingUsers, onRefresh]);
+  }, [currentDate, handleNavigate, isLoading, loadingUsers, loadingEntries, onRefresh]);
 
   // Definir formatos personalizados para el calendario en español
   const formats = useMemo(() => ({
@@ -510,7 +574,7 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
           event: EventComponent
         }}
         messages={messages}
-        selectable={true}
+        selectable={!loadingEntries}
         onSelectSlot={handleSelectSlot}
         onSelectEvent={handleSelectEvent}
         longPressThreshold={20}

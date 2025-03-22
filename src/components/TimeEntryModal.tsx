@@ -9,7 +9,7 @@ interface TimeEntryModalProps {
   start: Date;
   end: Date;
   tasks: Task[];
-  onSubmit: (data: { taskId: number; start: Date; end: Date }) => void;
+  onSubmit: (data: { taskId: number; start: Date; end: Date; description: string }) => void;
   isCreating: boolean;
   error: string | null;
 }
@@ -27,6 +27,7 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
+  const [description, setDescription] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
     setStartDate(start);
     setEndDate(end);
     setSelectedTaskId(null);
+    setDescription('');
     setFormError(null);
   }, [isOpen, start, end]);
 
@@ -56,7 +58,8 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
     onSubmit({
       taskId: selectedTaskId,
       start: startDate,
-      end: endDate
+      end: endDate,
+      description: description.trim()
     });
   };
 
@@ -85,6 +88,11 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
     if (value) {
       setEndDate(new Date(value));
     }
+  };
+
+  // Manejar cambios en la descripción
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(e.target.value);
   };
 
   if (!isOpen) return null;
@@ -152,6 +160,21 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isCreating}
               required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              Descripción
+            </label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={handleDescriptionChange}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={3}
+              disabled={isCreating}
+              placeholder="Describe brevemente el trabajo realizado..."
             />
           </div>
 
