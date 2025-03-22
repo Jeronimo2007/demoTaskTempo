@@ -2,15 +2,7 @@ import React, { useState } from 'react';
 import moment from 'moment';
 import { FaTimes, FaTrash } from 'react-icons/fa';
 import { TimeEntryResponse } from '@/services/timeEntryService';
-
-interface Task {
-  id: number;
-  title: string;
-  status?: string;
-  due_date?: string;
-  client: string;
-  color?: string;
-}
+import { Task } from '@/types/task'; // Import the shared Task interface
 
 interface TimeEntryDetailsModalProps {
   isOpen: boolean;
@@ -35,42 +27,38 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Calculate duration in seconds
+  const startTime = new Date(timeEntry.start_time).getTime();
+  const endTime = new Date(timeEntry.end_time).getTime();
+  const duration = (endTime - startTime) / 1000;
+  
+  // Format duration in hours and minutes
+  const hours = Math.floor(duration / 3600);
+  const minutes = Math.floor((duration % 3600) / 60);
+  const durationString = hours > 0 
+    ? `${hours} horas y ${minutes} minutos`
+    : `${minutes} minutos`;
+
+  // Format dates for display
   const formatDate = (dateString: string) => {
     return moment(dateString).format('DD/MM/YYYY HH:mm');
   };
 
-  const calculateDuration = () => {
-    const startTime = new Date(timeEntry.start_time).getTime();
-    const endTime = new Date(timeEntry.end_time).getTime();
-    const duration = (endTime - startTime) / 1000;
-    
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration % 3600) / 60);
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-  };
-
-  const handleDeleteClick = () => {
-    setShowConfirm(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    setIsDeleting(true);
-    setError(null);
-    
-    try {
-      await onDelete(timeEntry.id);
-      onClose();
-    } catch (err) {
-      console.error('Error deleting time entry:', err);
-      setError('Error al eliminar la entrada de tiempo. Inténtalo de nuevo.');
-    } finally {
-      setIsDeleting(false);
-      setShowConfirm(false);
+  const handleDelete = async () => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar esta entrada de tiempo?')) {
+      setIsDeleting(true);
+      setError(null);
+      
+      try {
+        await onDelete(timeEntry.id);
+        onClose();
+      } catch (err) {
+        console.error('Error al eliminar entrada de tiempo:', err);
+        setError('Error al eliminar la entrada de tiempo. Inténtalo de nuevo.');
+      } finally {
+        setIsDeleting(false);
+      }
     }
-  };
-
-  const handleCancelDelete = () => {
-    setShowConfirm(false);
   };
 
   return (
@@ -89,31 +77,24 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
 
         <div className="p-4">
           <div className="mb-4">
-            <h3 className="text-lg font-medium">{task?.title || 'Tarea sin asignar'}</h3>
+            <h3 className="font-medium text-lg">{task ? task.title : 'Tarea sin asignar'}</h3>
             {task && (
-              <p className="text-sm text-gray-600">Cliente: {task.client}</p>
+              <div className="mt-1 text-sm text-gray-600">
+                <p><span className="font-medium">Estado:</span> {task.status}</p>
+                <p>
+                  <span className="font-medium">Cliente:</span> {task.client_name || `Cliente ${task.client_id}`}
+                </p>
+              </div>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Inicio</label>
-              <p className="text-gray-900">{formatDate(timeEntry.start_time)}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Fin</label>
-              <p className="text-gray-900">{formatDate(timeEntry.end_time)}</p>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Duración</label>
-            <p className="text-gray-900">{calculateDuration()}</p>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Creado por</label>
-            <p className="text-gray-900">{creatorName || `Usuario ${timeEntry.user_id}`}</p>
+          <div className="space-y-2 text-sm text-gray-700">
+            <p><span className="font-medium">Inicio:</span> {formatDate(timeEntry.start_time)}</p>
+            <p><span className="font-medium">Fin:</span> {formatDate(timeEntry.end_time)}</p>
+            <p><span className="font-medium">Duración:</span> {durationString}</p>
+            {creatorName && (
+              <p><span className="font-medium">Creado por:</span> {creatorName}</p>
+            )}
           </div>
 
           {error && (
@@ -122,51 +103,24 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
             </div>
           )}
 
-          {showConfirm ? (
-            <div className="border-t pt-4 mt-2">
-              <p className="text-sm text-gray-700 mb-4">¿Estás seguro de que deseas eliminar esta entrada de tiempo? Esta acción no se puede deshacer.</p>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCancelDelete}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
-                  disabled={isDeleting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? (
-                    <>
-                      <div className="animate-spin h-4 w-4 mr-2 border-b-2 border-white rounded-full"></div>
-                      Eliminando...
-                    </>
-                  ) : (
-                    <>
-                      <FaTrash className="mr-2" /> Eliminar
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="border-t pt-4 mt-2">
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleDeleteClick}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center"
-                  disabled={isDeleting}
-                >
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin h-4 w-4 mr-2 border-b-2 border-white rounded-full"></div>
+                  Eliminando...
+                </>
+              ) : (
+                <>
                   <FaTrash className="mr-2" /> Eliminar
-                </button>
-              </div>
-            </div>
-          )}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

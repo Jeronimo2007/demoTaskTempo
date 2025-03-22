@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Calendar, momentLocalizer, SlotInfo, Event, EventPropGetter, View } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/es'; // Importar la localización española de moment
@@ -9,26 +9,19 @@ import { FaSync } from 'react-icons/fa';
 import TimeEntryModal from './TimeEntryModal';
 import TimeEntryDetailsModal from '@/components/TimeEntryDetailsModal';
 import { useAuthStore } from '@/store/useAuthStore';
+import { Task } from '@/types/task'; // Import the shared Task interface
 
 // Configurar moment para usar español
 moment.locale('es');
 
 const localizer = momentLocalizer(moment);
 
-type Task = {
-  id: number;
-  title: string;
-  status: string;
-  due_date: string;
-  client: string;
-};
-
 interface TimeEntryCalendarProps {
   apiTimeEntries: TimeEntryResponse[];
   tasks: Task[];
   isLoading?: boolean;
   onRefresh?: () => void;
-  onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date }) => Promise<void>;
+  onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date }) => Promise<any>; // Changed from Promise<void> to Promise<any>
   // Props for user information
   userMap?: Record<number, string> | ((userId: number) => string); // Map of user_id to name or function to get name
   currentUserId?: number; // ID of the currently logged-in user
@@ -36,6 +29,11 @@ interface TimeEntryCalendarProps {
   fetchUsers?: () => Promise<Record<number, string>>;
   // New prop for user color mapping
   userColorMap?: Record<number, string>;
+}
+
+// Define imperative handle interface for ref
+export interface TimeEntryCalendarHandle {
+  updateEntries: (entries: TimeEntryResponse[]) => void;
 }
 
 // Tipo personalizado para nuestros eventos de calendario
@@ -59,8 +57,8 @@ interface ToolbarProps {
   onView: (view: View) => void;
 }
 
-const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({ 
-  apiTimeEntries, 
+const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarProps>(({ 
+  apiTimeEntries: initialTimeEntries, 
   tasks, 
   isLoading = false,
   onRefresh,
@@ -69,7 +67,25 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   currentUserId,
   fetchUsers,
   userColorMap = {} // Default to empty object if not provided
-}) => {
+}, ref) => {
+  // State for time entries that can be updated via ref
+  const [apiTimeEntries, setApiTimeEntries] = useState<TimeEntryResponse[]>(initialTimeEntries);
+  // State for current date in calendar
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  // State for loading entries
+  const [loadingEntries, setLoadingEntries] = useState<boolean>(false);
+  
+  // Update entries when props change
+  useEffect(() => {
+    setApiTimeEntries(initialTimeEntries);
+  }, [initialTimeEntries]);
+  
+  // Expose methods through ref
+  useImperativeHandle(ref, () => ({
+    updateEntries: (entries: TimeEntryResponse[]) => {
+      setApiTimeEntries(entries);
+    }
+  }));
   // Estado para el modal de creación de time entry
   const [showModal, setShowModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{start: Date, end: Date} | null>(null);
@@ -89,6 +105,45 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   // Obtener el usuario actual del store de autenticación
   const authUser = useAuthStore(state => state.user);
   const effectiveCurrentUserId = currentUserId || (authUser ? authUser.id : undefined);
+
+  // Function to get week start and end dates
+  const getWeekRange = useCallback((date: Date): { start: Date, end: Date } => {
+    const startOfWeek = moment(date).startOf('week').toDate();
+    const endOfWeek = moment(date).endOf('week').toDate();
+    return { start: startOfWeek, end: endOfWeek };
+  }, []);
+
+  // Function to fetch time entries for current week
+  const fetchTimeEntriesForWeek = useCallback(async (date: Date) => {
+    try {
+      setLoadingEntries(true);
+      const { start, end } = getWeekRange(date);
+      
+      console.log(`🔄 Fetching time entries for week of ${moment(date).format('DD/MM/YYYY')}`);
+      console.log(`📅 Week range: ${moment(start).format('DD/MM/YYYY')} to ${moment(end).format('DD/MM/YYYY')}`);
+      
+      const entries = await timeEntryService.getTimeEntriesByDateRange(start, end);
+      
+      // Filter entries for current tasks if needed
+      const taskIds = tasks.map(task => task.id);
+      const filteredEntries = entries.filter(entry => taskIds.includes(entry.task_id));
+      
+      console.log(`✅ Fetched ${entries.length} entries, filtered to ${filteredEntries.length} entries for current tasks`);
+      
+      setApiTimeEntries(filteredEntries);
+      return filteredEntries;
+    } catch (error) {
+      console.error('❌ Error fetching time entries for week:', error);
+      throw error;
+    } finally {
+      setLoadingEntries(false);
+    }
+  }, [getWeekRange, tasks]);
+
+  // Fetch entries when date or tasks change
+  useEffect(() => {
+    fetchTimeEntriesForWeek(currentDate);
+  }, [currentDate, fetchTimeEntriesForWeek]);
 
   // Efecto para cargar los usuarios si es necesario
   useEffect(() => {
@@ -167,15 +222,35 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
     try {
       await timeEntryService.deleteTimeEntry(entryId);
       
-      // Refresh the calendar after successful deletion
-      if (onRefresh) {
-        onRefresh();
-      }
+      // Refresh the current week's entries after deletion
+      fetchTimeEntriesForWeek(currentDate);
     } catch (error) {
       console.error("Error deleting time entry:", error);
       throw error;
     }
-  }, [onRefresh]);
+  }, [currentDate, fetchTimeEntriesForWeek]);
+
+  // Handler for navigating to a different date
+  const handleNavigate = useCallback((action: 'PREV' | 'NEXT' | 'TODAY') => {
+    let newDate;
+
+    switch (action) {
+      case 'PREV':
+        newDate = moment(currentDate).subtract(1, 'week').toDate();
+        break;
+      case 'NEXT':
+        newDate = moment(currentDate).add(1, 'week').toDate();
+        break;
+      case 'TODAY':
+        newDate = new Date();
+        break;
+      default:
+        return;
+    }
+
+    console.log(`🔄 Navigating to ${action}: ${moment(newDate).format('DD/MM/YYYY')}`);
+    setCurrentDate(newDate);
+  }, [currentDate]);
 
   // Handler para crear una nueva entrada de tiempo
   const handleCreateTimeEntry = useCallback(async (data: { taskId: number, start: Date, end: Date }) => {
@@ -194,10 +269,8 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         setShowModal(false);
         setSelectedSlot(null);
         
-        // Refrescar las entradas de tiempo si hay un callback
-        if (onRefresh) {
-          onRefresh();
-        }
+        // Refresh the current week's entries
+        fetchTimeEntriesForWeek(currentDate);
       } catch (err) {
         console.error('Error al crear time entry:', err);
         setError('Error al guardar la entrada de tiempo. Inténtalo de nuevo.');
@@ -205,7 +278,7 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         setCreating(false);
       }
     }
-  }, [onTimeEntryCreate, onRefresh]);
+  }, [onTimeEntryCreate, currentDate, fetchTimeEntriesForWeek]);
 
   // Función para parsear correctamente las fechas de strings ISO a objetos Date
   // preservando la zona horaria local
@@ -288,11 +361,14 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
     // Get creator name using our helper function
     const creator = getUserName(entry.user_id);
     
+    // Get client name from task if available
+    const clientName = task?.client || task?.client_name || (task?.client_id ? `Cliente ${task.client_id}` : 'Sin cliente');
+    
     return (
       <div>
         <strong>{event.title}</strong>
         <div style={{ fontSize: '0.8em' }}>
-          {task ? `Cliente: ${task.client}` : ''}
+          {task ? `Cliente: ${clientName}` : 'Sin cliente'}
         </div>
         <div style={{ fontSize: '0.8em' }}>
           {durationString}
@@ -305,23 +381,35 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
   }, [getUserName]);
 
   // Custom toolbar component - removed month view button
-  const CustomToolbar = useCallback(({ date, onNavigate }: ToolbarProps) => {
+  const CustomToolbar = useCallback(({ date }: ToolbarProps) => {
     const goToBack = () => {
-      onNavigate('PREV');
+      handleNavigate('PREV');
     };
 
     const goToNext = () => {
-      onNavigate('NEXT');
+      handleNavigate('NEXT');
     };
 
     const goToCurrent = () => {
-      onNavigate('TODAY');
+      handleNavigate('TODAY');
     };
 
     const handleRefresh = () => {
-      if (onRefresh) {
-        onRefresh();
-      }
+      console.log('🔄 Calendar refresh button clicked');
+      
+      // Refresh current week entries
+      setLoadingUsers(true);
+      
+      fetchTimeEntriesForWeek(currentDate)
+        .then(() => {
+          console.log('✅ Calendar refresh completed');
+        })
+        .catch(err => {
+          console.error('❌ Error during calendar refresh:', err);
+        })
+        .finally(() => {
+          setLoadingUsers(false);
+        });
     };
 
     const label = () => {
@@ -360,9 +448,9 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
               type="button" 
               onClick={handleRefresh} 
               className="toolbar-btn refresh-btn"
-              disabled={isLoading || loadingUsers}
+              disabled={isLoading || loadingUsers || loadingEntries}
             >
-              <FaSync className={(isLoading || loadingUsers) ? 'animate-spin' : ''} />
+              <FaSync className={(isLoading || loadingUsers || loadingEntries) ? 'animate-spin' : ''} />
             </button>
           )}
         </div>
@@ -399,7 +487,7 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
 
   return (
     <div className="calendar-container">
-      {(isLoading || loadingUsers) && (
+      {(isLoading || loadingUsers || loadingEntries) && (
         <div className="loading-indicator flex items-center justify-center p-2 bg-blue-50 text-blue-700 rounded mb-4">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-800 mr-2"></div>
           <span>Cargando datos...</span>
@@ -426,6 +514,8 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
         onSelectSlot={handleSelectSlot}
         onSelectEvent={handleSelectEvent}
         longPressThreshold={20}
+        date={currentDate}
+        onNavigate={(newDate) => setCurrentDate(newDate)}
       />
       
       {/* Modal para crear time entry */}
@@ -455,6 +545,9 @@ const TimeEntryCalendar: React.FC<TimeEntryCalendarProps> = ({
       )}
     </div>
   );
-};
+});
+
+// Assign displayName to avoid warnings in development
+TimeEntryCalendar.displayName = 'TimeEntryCalendar';
 
 export default TimeEntryCalendar;

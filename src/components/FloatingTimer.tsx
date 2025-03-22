@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlay, FaPause, FaStop, FaSave } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
-
-type Task = {
-  id: number;
-  title: string;
-  status: string;
-  due_date: string;
-  client: string;
-};
+import { Task } from '@/types/task'; // Import Task from types file
 
 type TimeEntry = {
   id?: number;
@@ -258,7 +251,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
             <option value="">Select Task</option>
             {tasks.map((task) => (
               <option key={task.id} value={task.id}>
-                {task.title} - {task.client}
+                {task.title} - Cliente {Number(task.client_id)}
               </option>
             ))}
           </select>

@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
 import { FaTimes, FaSave } from 'react-icons/fa';
-
-type Task = {
-  id: number;
-  title: string;
-  status?: string;
-  due_date?: string;
-  client: string;
-  color?: string;
-};
+import { Task } from '@/types/task'; // Import the shared Task interface
 
 interface TimeEntryModalProps {
   isOpen: boolean;
@@ -127,7 +119,7 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
               <option value="">Seleccionar tarea</option>
               {tasks.map(task => (
                 <option key={task.id} value={task.id}>
-                  {task.title} - {task.client}
+                  {task.title} - {task.client_name || `Cliente ${task.client_id}`}
                 </option>
               ))}
             </select>

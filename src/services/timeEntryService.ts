@@ -22,6 +22,11 @@ export interface TimeEntryResponse {
     duration: number;
 }
 
+export interface DateRangeRequest {
+    start_date: string;
+    end_date: string;
+}
+
 const getToken = () => {
     return document.cookie
         .split("; ")
@@ -69,6 +74,28 @@ export const timeEntryService = {
             `${API_URL}/timeEntry/get_all_time_entries`,
             { headers: { Authorization: `Bearer ${token}` } }
         );
+        return response.data;
+    },
+
+    // Get time entries for a specific date range
+    getTimeEntriesByDateRange: async (startDate: Date, endDate: Date): Promise<TimeEntryResponse[]> => {
+        const token = getToken();
+
+        // Format dates for API
+        const formattedRequest: DateRangeRequest = {
+            start_date: formatDateForAPI(startDate),
+            end_date: formatDateForAPI(endDate)
+        };
+
+        console.log(`📅 Fetching time entries from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`);
+        
+        const response = await axios.post(
+            `${API_URL}/timeEntry/get_all_time_entries`,
+            formattedRequest,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        console.log(`✅ Received ${response.data.length} time entries for the date range`);
         return response.data;
     },
 
