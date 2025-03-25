@@ -26,6 +26,13 @@ export default function LoginPage() {
   return (
     <div className="flex h-screen justify-center items-center bg-gray-100">
       <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-black">
+      <div className="flex justify-center mb-4 mt-2">
+        <img 
+          src="/img/logo.jpeg" 
+          alt="SSL" 
+          className="h-60 object-contain" // Increased height from h-12 to h-16
+        />
+      </div>
         <h2 className="text-xl font-bold mb-4 text-center">Iniciar Sesión</h2>
         {error && <p className="text-red-500">{error}</p>}
         <input

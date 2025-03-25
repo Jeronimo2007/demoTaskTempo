@@ -9,6 +9,7 @@ import FloatingTimer from '@/components/FloatingTimer';
 import taskService from '@/services/taskService';
 import timeEntryService from '@/services/timeEntryService';
 import { Task } from '@/types/task';
+import EventNotifications from '@/components/EventNotifications';
 
 interface TimeEntry {
   id?: number;
@@ -208,6 +209,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
       <div className="flex-1 overflow-auto">
+        {/* Top bar with notifications */}
+        <div className="bg-white p-4 shadow-sm flex justify-end items-center">
+          <EventNotifications />
+        </div>
+        
         <main className="p-6 min-h-screen">{children}</main>
         
         {!isLoading && tasks.length > 0 && (

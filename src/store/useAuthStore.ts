@@ -4,7 +4,6 @@ type User = {
   id: string | undefined;
   username: string
   role: string 
-  token: string 
 };
 
 type AuthState = {

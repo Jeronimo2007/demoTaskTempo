@@ -4,7 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "Time Management",
+  title: "Task Tempo | SSL",
 };
 
 export default function RootLayout({

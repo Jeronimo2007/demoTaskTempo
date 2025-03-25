@@ -47,7 +47,7 @@ const AREA_OPTIONS = [
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function AdminPanel() {
-  const { user, token, setUser } = useAuthStore();
+  const { user, setUser } = useAuthStore(); // Prefixed with underscore to indicate intentionally unused
   const router = useRouter();
 
   const [tasks, setTasks] = useState<TaskData[]>([]);
@@ -226,7 +226,7 @@ export default function AdminPanel() {
       };
   
   
-      const response = await axios.put(
+      await axios.put(
         `${API_URL}/tasks/update_task`, // Updated endpoint
         data,
         { 

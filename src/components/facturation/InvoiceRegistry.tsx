@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -35,7 +35,7 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
   // Estado para las facturas y carga
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Función para formatear moneda
   const formatCurrency = (amount: number): string => {
@@ -57,14 +57,14 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
   };
 
   // Función para obtener el registro de facturas
-  const fetchInvoiceRegistry = async () => {
+  const fetchInvoiceRegistry = useCallback(async () => {
     if (!token || !apiUrl) {
-      setError('No hay token de autenticación o URL de API');
+      setErrorMessage('No hay token de autenticación o URL de API');
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setErrorMessage(null);
 
     try {
       const response = await axios.get(`${apiUrl}/reports/invoices/registry`, {
@@ -82,28 +82,28 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
     } catch (error) {
       console.error('Error al obtener el registro de facturas:', error);
       
-      let errorMessage = 'Error al cargar el registro de facturas';
+      let message = 'Error al cargar el registro de facturas';
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
-          errorMessage = 'No autorizado. Verifique su sesión e intente nuevamente.';
+          message = 'No autorizado. Verifique su sesión e intente nuevamente.';
         } else {
-          errorMessage = `Error ${error.response?.status || 'desconocido'}: ${error.message}`;
+          message = `Error ${error.response?.status || 'desconocido'}: ${error.message}`;
         }
       }
       
-      setError(errorMessage);
-      showNotification('Error', errorMessage, 'error');
+      setErrorMessage(message);
+      showNotification('Error', message, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, apiUrl, startDate, endDate, showNotification]);
 
   // Cargar facturas cuando cambian las fechas
   useEffect(() => {
     if (token && apiUrl) {
       fetchInvoiceRegistry();
     }
-  }, [token, apiUrl]); // No incluimos startDate y endDate para evitar cargas automáticas
+  }, [token, apiUrl, fetchInvoiceRegistry]); // Añadimos fetchInvoiceRegistry como dependencia
 
   // Función para manejar la búsqueda con las fechas seleccionadas
   const handleSearch = (e: React.FormEvent) => {
@@ -184,9 +184,9 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
       </form>
 
       {/* Mensaje de error */}
-      {error && (
+      {errorMessage && (
         <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          <p>{error}</p>
+          <p>{errorMessage}</p>
         </div>
       )}
 

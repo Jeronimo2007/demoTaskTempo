@@ -26,7 +26,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   const [isPaused, setIsPaused] = useState(false);
   const elapsedTimeRef = useRef(0); // Use useRef to persist elapsed time between renders
   const [displayTime, setDisplayTime] = useState(0); // New state for displaying time
-  const [position, setPosition] = useState({ x: 20, y: 500 });
+  const [position, setPosition] = useState({ x: 20, y: 600 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMinimized, setIsMinimized] = useState(false);
@@ -34,6 +34,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
   const [description, setDescription] = useState<string>('');
   
   // References for persistent state between prop updates
@@ -107,10 +108,14 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         window.clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
+      // Clear any error timeouts
+      if (errorTimeout) {
+        clearTimeout(errorTimeout);
+      }
       // Ensure we notify that timer is inactive when component unmounts
       notifyTimerStateChange(false);
     };
-  }, [notifyTimerStateChange]);
+  }, [notifyTimerStateChange, errorTimeout]);
   
   // Use localStorage to save timer state between page refreshes
   useEffect(() => {
@@ -265,6 +270,11 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   const handleStart = () => {
     if (selectedTaskId === null) {
       setErrorMessage("Por favor primero selecciona una tarea");
+      
+      // Clear error message after 3 seconds
+      if (errorTimeout) clearTimeout(errorTimeout);
+      const timeout = setTimeout(() => setErrorMessage(null), 3000);
+      setErrorTimeout(timeout);
       return;
     }
     
@@ -345,6 +355,11 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           setErrorMessage(null);
         } catch (error) {
           setErrorMessage("Failed to save time entry to server");
+          
+          // Clear error message after 3 seconds
+          if (errorTimeout) clearTimeout(errorTimeout);
+          const timeout = setTimeout(() => setErrorMessage(null), 3000);
+          setErrorTimeout(timeout);
         } finally {
           // Reset timer
           setIsSaving(false);
@@ -521,7 +536,13 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
               const newTaskId = e.target.value ? Number(e.target.value) : null;
               setSelectedTaskId(newTaskId);
               // Clear error message when task is selected
-              if (newTaskId) setErrorMessage(null);
+              if (newTaskId) {
+                setErrorMessage(null);
+                if (errorTimeout) {
+                  clearTimeout(errorTimeout);
+                  setErrorTimeout(null);
+                }
+              }
               
               // Update references for persistence
               timerStateRef.current.selectedTaskId = newTaskId;

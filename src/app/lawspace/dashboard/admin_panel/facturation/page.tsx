@@ -3,10 +3,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { useAuthStore } from '../../../../../store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import InvoiceRegistry from '../../../../../components/facturation/InvoiceRegistry';
+
 
 // Updated Client interface to match the API response
 interface Client {
@@ -22,6 +23,7 @@ interface Client {
   address: string;
   email: string;
 }
+
 
 // Form interfaces
 interface InvoiceByHoursFormData {
@@ -63,6 +65,16 @@ export default function FacturationPage() {
 
   // Get API base URL from environment variable or use default
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
+  
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    return {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      }
+    };
+  };
 
   // Set up forms
   const hoursForm = useForm<InvoiceByHoursFormData>({
@@ -84,27 +96,14 @@ export default function FacturationPage() {
     },
   });
 
-  // Check authentication on component mount
-  useEffect(() => {
-    if (!token || !user) {
-      // Redirect to login if no token is found
-      showNotification('Sesión expirada', 'Por favor inicie sesión nuevamente', 'error');
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000);
-    }
-  }, [token, user, router]);
-
-  // Create axios instance with auth headers using the token from useAuthStore
-  const getAuthHeaders = () => {
-    return {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json',
-      }
-    };
+  // Custom toast function
+  const showNotification = (title: string, message: string, type: 'success' | 'error') => {
+    setNotification({ visible: true, title, message, type });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, visible: false }));
+    }, 3000); // Hide after 3 seconds
   };
-
+  
   // Get clients on component mount
   useEffect(() => {
     // Skip fetching if not authenticated
@@ -119,7 +118,12 @@ export default function FacturationPage() {
         console.log('Fetching clients from:', endpoint);
         
         // Include auth token in the request
-        const authHeaders = getAuthHeaders();
+        const authHeaders = {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json',
+          }
+        };
         console.log('Using auth headers:', authHeaders);
         
         const response = await axios.get(endpoint, authHeaders);
@@ -163,16 +167,8 @@ export default function FacturationPage() {
     fetchClients();
   }, [API_URL, token, logout, router]);
 
-  // Custom toast function
-  const showNotification = (title: string, message: string, type: 'success' | 'error') => {
-    setNotification({ visible: true, title, message, type });
-    setTimeout(() => {
-      setNotification(prev => ({ ...prev, visible: false }));
-    }, 3000); // Hide after 3 seconds
-  };
-
   // Helper function to download file from response
-  const downloadFile = (response: any, defaultFileName: string) => {
+  const downloadFile = (response: AxiosResponse<Blob>, defaultFileName: string) => {
     // Get filename from Content-Disposition header if available
     const contentDisposition = response.headers['content-disposition'];
     let filename = defaultFileName;
@@ -186,7 +182,7 @@ export default function FacturationPage() {
     
     // Create a blob from the response data
     const blob = new Blob([response.data], { 
-      type: response.headers['content-type'] || 'application/octet-stream' 
+      type: response.headers['content-type']?.toString() || 'application/octet-stream' 
     });
     
     // Create a URL for the blob
@@ -217,7 +213,7 @@ export default function FacturationPage() {
       const authHeaders = getAuthHeaders();
       
       // Modify to handle file download - set responseType to blob
-      const response = await axios.post(`${API_URL}/reports/invoices/by-hours`, data, {
+      const response = await axios.post<Blob>(`${API_URL}/reports/invoices/by-hours`, data, {
         ...authHeaders,
         responseType: 'blob'
       });
@@ -269,7 +265,7 @@ export default function FacturationPage() {
       const authHeaders = getAuthHeaders();
       
       // Modify to handle file download - set responseType to blob
-      const response = await axios.post(`${API_URL}/reports/invoices/by-percentage`, data, {
+      const response = await axios.post<Blob>(`${API_URL}/reports/invoices/by-percentage`, data, {
         ...authHeaders,
         responseType: 'blob'
       });

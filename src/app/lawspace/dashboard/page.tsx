@@ -39,7 +39,7 @@ type ClientSummaryData = {
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Dashboard() {
-  const { user, setUser } = useAuthStore();
+  const { user } = useAuthStore();
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);

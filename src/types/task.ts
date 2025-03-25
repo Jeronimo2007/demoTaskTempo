@@ -2,7 +2,7 @@
 export interface Task {
   id: number;
   title: string;
-  status: string;
+  status: TaskStatus;
   due_date?: string;
   client?: string;
   client_id?: number;
@@ -11,8 +11,11 @@ export interface Task {
 
 // Define an AssignedTask interface for task assignments
 export interface AssignedTask {
+  id: number;
+  user_id: number;
   task_id: number;
-  client_id: number;
+  client_id?: number;
+  assigned_by: unknown;
 }
 
 // Define a TaskWithAssignments interface that extends Task
@@ -20,11 +23,5 @@ export interface TaskWithAssignments extends Task {
   assignments?: AssignedTask[]; // Properly typed assignments array
 }
 
-// Utility function to ensure task format is correct
-export const ensureTaskFormat = (task: any): Task => {
-  return {
-    ...task,
-    client_id: task.client_id !== undefined ? Number(task.client_id) : null,
-    client_name: task.client_name || ''
-  };
-};
+// Define a type for task status
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | string;

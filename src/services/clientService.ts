@@ -4,12 +4,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Get token from cookies
 const getToken = (): string => {
-  if (typeof document === 'undefined') return "";
-  
-  return document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("token="))
-    ?.split("=")[1] || "";
+  if (typeof document === 'undefined') return '';
+
+  return (
+    document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('token='))
+      ?.split('=')[1] || ''
+  );
 };
 
 // Define a more complete Client interface based on the API response
@@ -73,7 +75,7 @@ let clientCache: Record<number, Client | null> = {};
 
 const clientService = {
   // Clear the cache (useful when you want to force a refresh)
-  clearCache: () => {
+  clearCache: (): void => {
     console.log('🧹 Clearing client cache');
     clientCache = {};
   },
@@ -86,26 +88,30 @@ const clientService = {
       const response = await axios.post<ClientResponse>(
         `${API_URL}/clients/create`,
         clientData,
-        { 
-          headers: { 
+        {
+          headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
-      
+
       if (!response.data || !response.data.id) {
         console.error('❌ Unexpected response format:', response.data);
         throw new Error('Invalid response from server');
       }
-      
+
       const client = response.data;
       console.log(`✅ Client created successfully:`, JSON.stringify(client));
-      
-      const name = client.name || client.nombre || client.client_name || `Cliente ${client.id}`;
+
+      const name =
+        client.name ||
+        client.nombre ||
+        client.client_name ||
+        `Cliente ${client.id}`;
       const clientObj: Client = {
         id: client.id,
-        name: name,
+        name,
         permanent: client.permanent,
         monthly_limit_hours: client.monthly_limit_hours,
         total_time: client.total_time,
@@ -113,13 +119,13 @@ const clientService = {
         phone: client.phone,
         city: client.city,
         address: client.address,
-        email: client.email
+        email: client.email,
       };
-      
+
       // Update cache with this new client
       clientCache[client.id] = clientObj;
       console.log(`💾 Added new client to cache: ID=${client.id}, Name=${name}`);
-      
+
       return clientObj;
     } catch (error) {
       console.error(`❌ Error creating client:`, error);
@@ -135,26 +141,30 @@ const clientService = {
       const response = await axios.put<ClientResponse>(
         `${API_URL}/clients/update/${clientData.id}`,
         clientData,
-        { 
-          headers: { 
+        {
+          headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
-      
+
       if (!response.data || !response.data.id) {
         console.error('❌ Unexpected response format:', response.data);
         throw new Error('Invalid response from server');
       }
-      
+
       const client = response.data;
       console.log(`✅ Client updated successfully:`, JSON.stringify(client));
-      
-      const name = client.name || client.nombre || client.client_name || `Cliente ${client.id}`;
+
+      const name =
+        client.name ||
+        client.nombre ||
+        client.client_name ||
+        `Cliente ${client.id}`;
       const clientObj: Client = {
         id: client.id,
-        name: name,
+        name,
         permanent: client.permanent,
         monthly_limit_hours: client.monthly_limit_hours,
         total_time: client.total_time,
@@ -162,13 +172,13 @@ const clientService = {
         phone: client.phone,
         city: client.city,
         address: client.address,
-        email: client.email
+        email: client.email,
       };
-      
+
       // Update cache with this updated client
       clientCache[client.id] = clientObj;
       console.log(`💾 Updated client in cache: ID=${client.id}, Name=${name}`);
-      
+
       return clientObj;
     } catch (error) {
       console.error(`❌ Error updating client with ID ${clientData.id}:`, error);
