@@ -10,6 +10,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { addDays, subYears } from "date-fns";
 
+// Constantes para el manejo de tokens
+const TOKEN_KEY = "token";
+const TOKEN_STORAGE_KEY = "ssl_auth_token";
+
 
 type ReportData = {
   Cliente: string;
@@ -21,6 +25,7 @@ type TaskData = {
   title: string;
   status: string;
   client: string;
+  area: string; // Added area property
 };
 
 type ClientSummaryData = {
@@ -34,7 +39,7 @@ type ClientSummaryData = {
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);
@@ -44,13 +49,51 @@ export default function Dashboard() {
   const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' });
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [uniqueClients, setUniqueClients] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Función mejorada para obtener el token, priorizando localStorage y luego cookies
   const getToken = useCallback(() => {
-    return document.cookie
+    // Primero intenta obtener el token de localStorage (más persistente)
+    const localToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (localToken) return localToken;
+    
+    // Si no está en localStorage, búscalo en las cookies
+    const cookieToken = document.cookie
       .split("; ")
-      .find((row) => row.startsWith("token="))
-      ?.split("=")[1] || "";
+      .find((row) => row.startsWith(`${TOKEN_KEY}=`))
+      ?.split("=")[1];
+    
+    // Si se encontró en cookies, guárdalo también en localStorage para futuras recargas
+    if (cookieToken) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, cookieToken);
+    }
+    
+    return cookieToken || "";
   }, []);
+
+  // Función para verificar si el token es válido
+  const verifyToken = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      router.push("/");
+      return false;
+    }
+
+    try {
+      // Intenta hacer una petición simple para verificar si el token es válido
+      await axios.get(`${API_URL}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return true;
+    } catch (error) {
+      console.error("Error al verificar el token:", error);
+      // Si el token no es válido, elimínalo y redirige al login
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      document.cookie = `${TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      router.push("/");
+      return false;
+    }
+  }, [getToken, router]);
 
   const fetchReportData = useCallback(async () => {
     try {
@@ -101,6 +144,7 @@ export default function Dashboard() {
         title: task.title,
         status: task.status,
         client: task.client,
+        area: task.area || "N/A", // Include area with fallback to "N/A" if not available
       }));
 
       setTasks(formattedTasks);
@@ -164,16 +208,38 @@ export default function Dashboard() {
     : tasks.filter(task => task.client === selectedClient);
 
   useEffect(() => {
-    if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
-      router.push("/");
-    } else {
-      fetchReportData();
-      fetchTasks();
-      fetchClientSummary();
-    }
-  }, [user, router, fetchReportData, fetchTasks, fetchClientSummary]);
+    const initializePage = async () => {
+      setIsLoading(true);
+      
+      // Si no hay usuario en el store, intentamos verificar el token
+      if (!user) {
+        const isValid = await verifyToken();
+        if (!isValid) return; // Si el token no es válido, verifyToken ya redirige al login
+      } else if (!["socio", "senior", "consultor"].includes(user.role)) {
+        router.push("/");
+        return;
+      }
+      
+      await Promise.all([
+        fetchReportData(),
+        fetchTasks(),
+        fetchClientSummary()
+      ]);
+      
+      setIsLoading(false);
+    };
+    
+    initializePage();
+  }, [
+    user, 
+    router, 
+    fetchReportData, 
+    fetchTasks, 
+    fetchClientSummary, 
+    verifyToken
+  ]);
 
-  if (!user) return <p>Cargando...</p>;
+  if (isLoading) return <p>Cargando...</p>;
 
 
   return (
@@ -251,7 +317,7 @@ export default function Dashboard() {
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="border p-2 text-center text-gray-500">
+                <td colSpan={4} className="border p-2 text-center text-gray-500"> {/* Updated colspan to 4 */}
                   No hay datos de asesoría permanente.
                 </td>
               </tr>
@@ -288,6 +354,7 @@ export default function Dashboard() {
               <th className="border border-black p-2 text-left">Título</th>
               <th className="border border-black p-2 text-left">Estado</th>
               <th className="border border-black p-2 text-left">Cliente</th>
+              <th className="border border-black p-2 text-left">Área</th> {/* New column header for area */}
             </tr>
           </thead>
           <tbody>
@@ -299,11 +366,12 @@ export default function Dashboard() {
                     {task.status}
                   </td>
                   <td className="border border-black p-2">{task.client}</td>
+                  <td className="border border-black p-2">{task.area}</td> {/* New cell to display area */}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="border p-2 text-center text-gray-500">
+                <td colSpan={4} className="border p-2 text-center text-gray-500">
                   {selectedClient === "all" 
                     ? "No hay tareas registradas." 
                     : `No hay tareas registradas para el cliente "${selectedClient}".`}

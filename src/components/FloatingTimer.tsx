@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPlay, FaPause, FaStop, FaSave } from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaSave, FaSync } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
 import { Task } from '@/types/task'; // Import Task from types file
 
@@ -24,7 +24,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const elapsedTimeRef = useRef(0); // Use useRef to persist elapsed time between renders
+  const [displayTime, setDisplayTime] = useState(0); // New state for displaying time
   const [position, setPosition] = useState({ x: 20, y: 500 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -35,22 +36,180 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   const [isSaving, setIsSaving] = useState(false);
   const [description, setDescription] = useState<string>('');
   
+  // References for persistent state between prop updates
   const timerRef = useRef<HTMLDivElement>(null);
+  const timerIntervalRef = useRef<number | null>(null); // Reference to store the timer interval
+  const previousTasksRef = useRef<Task[]>(tasks);
+  
+  // Store the timer state between re-renders
+  const timerStateRef = useRef({
+    isRunning: false,
+    isPaused: false,
+    elapsedTime: 0,
+    displayTime: 0,
+    selectedTaskId: null as number | null,
+    startTime: null as Date | null,
+    currentTimeEntry: null as TimeEntry | null,
+    description: ''
+  });
+  
+  // Function to notify layout about timer state changes
+  const notifyTimerStateChange = useCallback((isActive: boolean) => {
+    const event = new CustomEvent('timerStateChange', { 
+      detail: { isActive } 
+    });
+    window.dispatchEvent(event);
+  }, []);
+  
+  // Synchronize state with refs when component mounts/unmounts
+  useEffect(() => {
+    // Restore state from ref if available (when tasks update but timer is active)
+    if ((isRunning || isPaused) && tasks !== previousTasksRef.current) {
+      if (timerStateRef.current.isRunning || timerStateRef.current.isPaused) {
+        setIsRunning(timerStateRef.current.isRunning);
+        setIsPaused(timerStateRef.current.isPaused);
+        setDisplayTime(timerStateRef.current.displayTime);
+        elapsedTimeRef.current = timerStateRef.current.elapsedTime;
+        setSelectedTaskId(timerStateRef.current.selectedTaskId);
+        setStartTime(timerStateRef.current.startTime);
+        setCurrentTimeEntry(timerStateRef.current.currentTimeEntry);
+        setDescription(timerStateRef.current.description);
+      }
+    }
+    previousTasksRef.current = tasks;
+  }, [tasks, isRunning, isPaused]);
+  
+  // Update refs whenever state changes
+  useEffect(() => {
+    timerStateRef.current = {
+      isRunning,
+      isPaused,
+      elapsedTime: elapsedTimeRef.current,
+      displayTime,
+      selectedTaskId,
+      startTime,
+      currentTimeEntry,
+      description
+    };
+    
+    // Notify parent about timer active state
+    notifyTimerStateChange(isRunning || isPaused);
+  }, [isRunning, isPaused, displayTime, selectedTaskId, startTime, currentTimeEntry, description, notifyTimerStateChange]);
   const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) : null;
   
   // Default timer color
   const timerColor = '#3B82F6'; // Blue color
 
-
-  // Timer effect
+  // Clean up timer when component unmounts
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    return () => {
+      if (timerIntervalRef.current !== null) {
+        window.clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      // Ensure we notify that timer is inactive when component unmounts
+      notifyTimerStateChange(false);
+    };
+  }, [notifyTimerStateChange]);
+  
+  // Use localStorage to save timer state between page refreshes
+  useEffect(() => {
+    const savedTimerState = localStorage.getItem('floatingTimerState');
+    if (savedTimerState) {
+      try {
+        const parsedState = JSON.parse(savedTimerState);
+        
+        // Validate the saved data has essential fields
+        if (parsedState && 
+            typeof parsedState.isRunning === 'boolean' && 
+            typeof parsedState.elapsedTime === 'number') {
+          
+          // Restore basic timer state
+          setIsRunning(parsedState.isRunning);
+          setIsPaused(parsedState.isPaused || false);
+          elapsedTimeRef.current = parsedState.elapsedTime;
+          setDisplayTime(parsedState.displayTime || parsedState.elapsedTime);
+          
+          // Restore task selection if it exists in current tasks
+          if (parsedState.selectedTaskId && 
+              tasks.some(task => task.id === parsedState.selectedTaskId)) {
+            setSelectedTaskId(parsedState.selectedTaskId);
+          }
+          
+          // Restore other state
+          if (parsedState.startTime) {
+            setStartTime(new Date(parsedState.startTime));
+          }
+          
+          if (parsedState.description) {
+            setDescription(parsedState.description);
+          }
+          
+          if (parsedState.currentTimeEntry) {
+            const entry = parsedState.currentTimeEntry;
+            if (entry.start_time) {
+              entry.start_time = new Date(entry.start_time);
+            }
+            setCurrentTimeEntry(entry);
+          }
+        }
+      } catch (error) {
+        console.error('Error restoring timer state:', error);
+        localStorage.removeItem('floatingTimerState');
+      }
+    }
+  }, [tasks]);
+
+  // Save timer state to localStorage whenever it changes
+  useEffect(() => {
+    if (isRunning || isPaused) {
+      const stateToSave = {
+        isRunning,
+        isPaused,
+        elapsedTime: elapsedTimeRef.current,
+        displayTime,
+        selectedTaskId,
+        startTime: startTime ? startTime.toISOString() : null,
+        currentTimeEntry: currentTimeEntry ? {
+          ...currentTimeEntry,
+          start_time: currentTimeEntry.start_time ? currentTimeEntry.start_time.toISOString() : undefined,
+          end_time: currentTimeEntry.end_time ? currentTimeEntry.end_time.toISOString() : undefined,
+        } : null,
+        description
+      };
+      localStorage.setItem('floatingTimerState', JSON.stringify(stateToSave));
+    } else if (localStorage.getItem('floatingTimerState')) {
+      // Clear saved state if timer is not active
+      localStorage.removeItem('floatingTimerState');
+    }
+  }, [isRunning, isPaused, displayTime, selectedTaskId, startTime, currentTimeEntry, description]);
+
+  // Timer effect - Using window.setInterval for better browser compatibility
+  useEffect(() => {
+    // Clear any existing interval first to prevent multiple intervals
+    if (timerIntervalRef.current !== null) {
+      window.clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    
     if (isRunning) {
-      timer = setInterval(() => {
-        setElapsedTime((prev) => prev + 1);
+      timerIntervalRef.current = window.setInterval(() => {
+        elapsedTimeRef.current += 1;
+        const newDisplayTime = elapsedTimeRef.current;
+        setDisplayTime(newDisplayTime);
+        
+        // Update references for persistence
+        timerStateRef.current.elapsedTime = elapsedTimeRef.current;
+        timerStateRef.current.displayTime = newDisplayTime;
       }, 1000);
     }
-    return () => clearInterval(timer);
+    
+    return () => {
+      if (timerIntervalRef.current !== null) {
+        window.clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
   }, [isRunning]);
 
   // Drag and drop functions
@@ -104,11 +263,13 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
 
   // Timer control functions
   const handleStart = () => {
-    if (selectedTaskId !== null) {
-      setIsRunning(true);
-      setIsPaused(false);
+    if (selectedTaskId === null) {
+      setErrorMessage("Por favor primero selecciona una tarea");
+      return;
+    }
+    
+    try {
       const now = new Date();
-      setStartTime(now);
       
       // Create a new time entry that we'll update later
       const newEntry: TimeEntry = {
@@ -117,17 +278,48 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         description: description
       };
       
+      // Reset both ref and display time
+      elapsedTimeRef.current = 0;
+      setDisplayTime(0);
+      
+      // Important: Set these states in this specific order
+      setStartTime(now);
       setCurrentTimeEntry(newEntry);
       setErrorMessage(null);
-    } else {
-      setErrorMessage("Por favor primero selecciona una tarea");
+      
+      // Set isRunning last so the useEffect will pick it up properly
+      setIsRunning(true);
+      setIsPaused(false);
+      
+      // Update references for persistence and notify layout
+      timerStateRef.current = {
+        isRunning: true,
+        isPaused: false,
+        elapsedTime: 0,
+        displayTime: 0,
+        selectedTaskId,
+        startTime: now,
+        currentTimeEntry: newEntry,
+        description
+      };
+      notifyTimerStateChange(true);
+    } catch (error) {
+      setErrorMessage("Error starting timer. Try again.");
     }
   };
 
   const handleStop = async (shouldSave: boolean = true) => {
     if (selectedTaskId !== null && (isRunning || isPaused) && currentTimeEntry) {
+      // Stop the timer first
       setIsRunning(false);
       setIsPaused(false);
+      
+      // Update references for persistence
+      timerStateRef.current.isRunning = false;
+      timerStateRef.current.isPaused = false;
+      
+      // Notify layout that timer is no longer active
+      notifyTimerStateChange(false);
       
       if (shouldSave) {
         setIsSaving(true);
@@ -137,7 +329,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         const finalEntry: TimeEntry = {
           ...currentTimeEntry,
           end_time: now,
-          duration: elapsedTime,
+          duration: elapsedTimeRef.current,
           description: description // Include the description
         };
         
@@ -152,22 +344,47 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           
           setErrorMessage(null);
         } catch (error) {
-          console.error('Error saving time entry:', error);
           setErrorMessage("Failed to save time entry to server");
         } finally {
           // Reset timer
           setIsSaving(false);
-          setElapsedTime(0);
+          elapsedTimeRef.current = 0;
+          setDisplayTime(0); // Reset display time as well
           setCurrentTimeEntry(null);
           setStartTime(null);
           setDescription('');
+          
+          // Reset references for persistence
+          timerStateRef.current = {
+            isRunning: false,
+            isPaused: false,
+            elapsedTime: 0,
+            displayTime: 0,
+            selectedTaskId: null,
+            startTime: null,
+            currentTimeEntry: null,
+            description: ''
+          };
         }
       } else {
         // Just reset without saving
-        setElapsedTime(0);
+        elapsedTimeRef.current = 0;
+        setDisplayTime(0); // Reset display time as well
         setCurrentTimeEntry(null);
         setStartTime(null);
         setErrorMessage(null);
+        
+        // Reset references for persistence
+        timerStateRef.current = {
+          isRunning: false,
+          isPaused: false,
+          elapsedTime: 0,
+          displayTime: 0,
+          selectedTaskId: null,
+          startTime: null,
+          currentTimeEntry: null,
+          description: ''
+        };
       }
     }
   };
@@ -180,9 +397,21 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
       // Just update the current time entry state with the elapsed time so far
       setCurrentTimeEntry({
         ...currentTimeEntry,
-        duration: elapsedTime,
+        duration: elapsedTimeRef.current,
         description: description // Update description in case it changed
       });
+      
+      // Update references for persistence
+      timerStateRef.current.isRunning = false;
+      timerStateRef.current.isPaused = true;
+      timerStateRef.current.currentTimeEntry = {
+        ...currentTimeEntry,
+        duration: elapsedTimeRef.current,
+        description: description
+      };
+      
+      // Still considered active when paused
+      notifyTimerStateChange(true);
     }
   };
 
@@ -190,6 +419,13 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
     if (isPaused && currentTimeEntry) {
       setIsRunning(true);
       setIsPaused(false);
+      
+      // Update references for persistence
+      timerStateRef.current.isRunning = true;
+      timerStateRef.current.isPaused = false;
+      
+      // Still considered active
+      notifyTimerStateChange(true);
     }
   };
 
@@ -200,6 +436,28 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
 
   const toggleMinimize = () => {
     setIsMinimized(!isMinimized);
+  };
+
+  const handleManualRefresh = () => {
+    // Save current timer state if active
+    if (isRunning || isPaused) {
+      const stateToSave = {
+        isRunning,
+        isPaused,
+        elapsedTime: elapsedTimeRef.current,
+        displayTime,
+        selectedTaskId,
+        startTime: startTime ? startTime.toISOString() : null,
+        currentTimeEntry: currentTimeEntry ? {
+          ...currentTimeEntry,
+          start_time: currentTimeEntry.start_time ? currentTimeEntry.start_time.toISOString() : undefined,
+          end_time: currentTimeEntry.end_time ? currentTimeEntry.end_time.toISOString() : undefined,
+        } : null,
+        description
+      };
+      localStorage.setItem('floatingTimerState', JSON.stringify(stateToSave));
+    }
+    window.location.reload();
   };
 
   // Format elapsed time (HH:MM:SS)
@@ -259,7 +517,15 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         <div className="p-3 bg-white text-black">
           <select
             value={selectedTaskId ?? ''}
-            onChange={(e) => setSelectedTaskId(Number(e.target.value) || null)}
+            onChange={(e) => {
+              const newTaskId = e.target.value ? Number(e.target.value) : null;
+              setSelectedTaskId(newTaskId);
+              // Clear error message when task is selected
+              if (newTaskId) setErrorMessage(null);
+              
+              // Update references for persistence
+              timerStateRef.current.selectedTaskId = newTaskId;
+            }}
             className="w-full border p-2 rounded mb-3 text-black"
             disabled={isRunning || isPaused}
           >
@@ -274,7 +540,11 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           {/* Description field */}
           <textarea
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              // Update references for persistence
+              timerStateRef.current.description = e.target.value;
+            }}
             placeholder="Descripción de la actividad"
             className="w-full border p-2 rounded mb-3 text-black resize-none"
             rows={2}
@@ -282,7 +552,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           />
           
           <div className="text-center text-xl font-bold mb-3 text-black">
-            {formatTime(elapsedTime)}
+            {formatTime(displayTime)} {/* Changed to use displayTime */}
           </div>
           
           {startTime && (
@@ -362,6 +632,14 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
               </div>
             )}
           </div>
+
+          <button 
+            onClick={handleManualRefresh} 
+            className="bg-gray-500 text-white px-4 py-2 rounded w-full mt-3 hover:bg-gray-600 transition flex items-center justify-center"
+          >
+            <FaSync className="mr-2" /> Refresh
+          </button>
+          
         </div>
       )}
     </div>

@@ -43,6 +43,13 @@ export default function Sidebar() {
         >
           Espacio de Trabajo
         </button>)}
+        {user && ['admin', 'socio', 'senior'].includes(user.role) && (
+        <button
+          onClick={() => router.push("/lawspace/dashboard/admin_panel/facturation")}
+          className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
+        >
+          Facturacion
+        </button>)}
         {/* Add more buttons here as needed */}
       </nav>
     </aside>

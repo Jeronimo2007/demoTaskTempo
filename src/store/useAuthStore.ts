@@ -1,9 +1,10 @@
 import { create } from "zustand";
 
 type User = {
-  id: string;
-  username: string;
-  role: string;
+  id: string | undefined;
+  username: string
+  role: string 
+  token: string 
 };
 
 type AuthState = {
