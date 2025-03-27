@@ -56,18 +56,18 @@ export default function Dashboard() {
     // Primero intenta obtener el token de localStorage (más persistente)
     const localToken = localStorage.getItem(TOKEN_STORAGE_KEY);
     if (localToken) return localToken;
-    
+
     // Si no está en localStorage, búscalo en las cookies
     const cookieToken = document.cookie
       .split("; ")
       .find((row) => row.startsWith(`${TOKEN_KEY}=`))
       ?.split("=")[1];
-    
+
     // Si se encontró en cookies, guárdalo también en localStorage para futuras recargas
     if (cookieToken) {
       localStorage.setItem(TOKEN_STORAGE_KEY, cookieToken);
     }
-    
+
     return cookieToken || "";
   }, []);
 
@@ -148,7 +148,7 @@ export default function Dashboard() {
       }));
 
       setTasks(formattedTasks);
-      
+
       // Extract unique client names for the filter dropdown
       const clients = [...new Set(formattedTasks.map(task => task.client))].filter(Boolean);
       setUniqueClients(clients);
@@ -203,14 +203,14 @@ export default function Dashboard() {
   };
 
   // Filter tasks based on selected client
-  const filteredTasks = selectedClient === "all" 
-    ? tasks 
+  const filteredTasks = selectedClient === "all"
+    ? tasks
     : tasks.filter(task => task.client === selectedClient);
 
   useEffect(() => {
     const initializePage = async () => {
       setIsLoading(true);
-      
+
       // Si no hay usuario en el store, intentamos verificar el token
       if (!user) {
         const isValid = await verifyToken();
@@ -219,23 +219,23 @@ export default function Dashboard() {
         router.push("/");
         return;
       }
-      
+
       await Promise.all([
         fetchReportData(),
         fetchTasks(),
         fetchClientSummary()
       ]);
-      
+
       setIsLoading(false);
     };
-    
+
     initializePage();
   }, [
-    user, 
-    router, 
-    fetchReportData, 
-    fetchTasks, 
-    fetchClientSummary, 
+    user,
+    router,
+    fetchReportData,
+    fetchTasks,
+    fetchClientSummary,
     verifyToken
   ]);
 
@@ -295,32 +295,10 @@ export default function Dashboard() {
           <tbody>
             {clientSummary.length > 0 ? (
               clientSummary.map((client, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="border border-black p-2">{client.client}</td>
-                  <td className="border border-black p-2">
-                    <div className="flex items-center">
-                      <div className="w-full bg-gray-200 rounded-full h-4 mr-2">
-                        <div 
-                          className="bg-blue-600 h-4 rounded-full" 
-                          style={{ 
-                            width: `${Math.min(100, (client.current_month_hours / client.monthly_hours) * 100)}%` 
-                          }}
-                        ></div>
-                      </div>
-                      <span className="whitespace-nowrap">
-                        {client.current_month_hours} / {client.monthly_hours} hrs
-                      </span>
-                    </div>
-                  </td>
-                  <td className="border border-black p-2">{formatCurrency(client.cost_current_month)}</td>
-                </tr>
+                <tr key={index} className="hover:bg-gray-50"><td className="border border-black p-2">{client.client}</td><td className="border border-black p-2"><div className="flex items-center"><div className="w-full bg-gray-200 rounded-full h-4 mr-2"><div className="bg-blue-600 h-4 rounded-full" style={{ width: `${Math.min(100, (client.current_month_hours / client.monthly_hours) * 100)}%` }}></div></div><span className="whitespace-nowrap">{client.current_month_hours} / {client.monthly_hours} hrs</span></div></td><td className="border border-black p-2">{formatCurrency(client.cost_current_month)}</td></tr>
               ))
             ) : (
-              <tr>
-                <td colSpan={4} className="border p-2 text-center text-gray-500"> {/* Updated colspan to 4 */}
-                  No hay datos de asesoría permanente.
-                </td>
-              </tr>
+              <tr><td colSpan={4} className="border p-2 text-center text-gray-500">No hay datos de asesoría permanente.</td></tr>
             )}
           </tbody>
         </table>
@@ -372,8 +350,8 @@ export default function Dashboard() {
             ) : (
               <tr>
                 <td colSpan={4} className="border p-2 text-center text-gray-500">
-                  {selectedClient === "all" 
-                    ? "No hay tareas registradas." 
+                  {selectedClient === "all"
+                    ? "No hay tareas registradas."
                     : `No hay tareas registradas para el cliente "${selectedClient}".`}
                 </td>
               </tr>

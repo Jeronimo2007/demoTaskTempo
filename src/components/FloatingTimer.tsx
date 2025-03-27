@@ -313,7 +313,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         description
       };
       notifyTimerStateChange(true);
-    } catch (error) {
+    } catch (err) {
+      console.error('Error starting timer:', err);
       setErrorMessage("Error starting timer. Try again.");
     }
   };
@@ -353,7 +354,8 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           }
           
           setErrorMessage(null);
-        } catch (error) {
+        } catch (err) {
+          console.error('Error saving time entry:', err);
           setErrorMessage("Failed to save time entry to server");
           
           // Clear error message after 3 seconds

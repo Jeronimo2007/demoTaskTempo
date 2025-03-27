@@ -2,10 +2,10 @@
 export interface Task {
   id: number;
   title: string;
-  status: TaskStatus;
+  status: string;
   due_date?: string;
   client?: string;
-  client_id?: number;
+  client_id?: number | null;
   client_name?: string;
 }
 

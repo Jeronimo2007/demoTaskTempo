@@ -13,9 +13,8 @@ export interface Task {
   title: string;
   status: string;
   due_date: string;
-  client_id: number; // Changed to only support number format
+  client_id: number;
   client_name?: string;
-  // Add other task properties as needed
 }
 
 const getToken = (): string => {
@@ -146,10 +145,10 @@ export const taskService = {
   },
   
   // Delete a task
-  deleteTask: async (taskId: number): Promise<any> => {
+  deleteTask: async (taskId: number): Promise<{ success: boolean }> => {
     const token = getToken();
     try {
-      const response = await axios.delete(
+      const response = await axios.delete<{ success: boolean }>(
         `${API_URL}/tasks/delete_task/${taskId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );

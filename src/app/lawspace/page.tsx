@@ -48,10 +48,13 @@ interface TimeEntry {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+interface CalendarRef {
+  updateEntries: (entries: TimeEntryResponse[]) => void;
+}
+
 const Workspace: React.FC = () => {
   const router = useRouter();
   const { user, setUser } = useAuthStore();
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,20 +63,18 @@ const Workspace: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [userColorMap, setUserColorMap] = useState<Record<number, string>>({});
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [clients, setClients] = useState<Record<string, Client>>({});
   const [isLoadingClients, setIsLoadingClients] = useState(false);
 
   interface ClientOption {
-    id: number;
+    id: string;
     label: string;
   }
 
   const [availableClients, setAvailableClients] = useState<ClientOption[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
-  const [filteredTimeEntries, setFilteredTimeEntries] = useState<TimeEntryResponse[]>([]);
   const [calendarEntries, setCalendarEntries] = useState<TimeEntryResponse[]>([]);
-  const calendarRef = useRef<any>(null);
+  const calendarRef = useRef<CalendarRef | null>(null);
 
   const getToken = useCallback(() => {
     return document.cookie
@@ -88,7 +89,7 @@ const Workspace: React.FC = () => {
     return ELEVATED_ROLES.includes(userRole);
   }, [user]);
 
-  const fetchClients = useCallback(async (token: string) => {
+  const fetchClients = useCallback(async () => {
     setIsLoadingClients(true);
     try {
       const clientsData = await clientService.getAllClients();
@@ -98,7 +99,6 @@ const Workspace: React.FC = () => {
         clientsMap[client.id] = client;
       });
 
-      setClients(clientsMap);
       return clientsMap;
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -114,11 +114,11 @@ const Workspace: React.FC = () => {
       const response = await axios.get(`${API_URL}/users/get_all_users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const fetchedUsers = response.data;
+      const fetchedUsers = response.data as User[];
       const colorMap: Record<number, string> = {};
       const usersWithColors = fetchedUsers.map((user: User) => {
         if (!user.color) {
-          user.color = '#666666'; // Default color
+          user.color = '#666666';
         }
         const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
         colorMap[userId] = user.color;
@@ -135,6 +135,43 @@ const Workspace: React.FC = () => {
     }
   }, []);
 
+  const fetchTimeEntries = useCallback(async (
+    userTasks = filteredTasks, 
+    startDate?: Date,
+    endDate?: Date
+  ) => {
+    if (!user) return;
+
+    setIsLoadingEntries(true);
+    try {
+      if (!startDate || !endDate) {
+        const currentDate = new Date();
+        startDate = new Date(currentDate);
+        startDate.setDate(currentDate.getDate() - currentDate.getDay());
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(currentDate);
+        endDate.setDate(currentDate.getDate() + (6 - currentDate.getDay()));
+        endDate.setHours(23, 59, 59, 999);
+      }
+
+      const entries = await timeEntryService.getTimeEntriesByDateRange(startDate, endDate);
+      const taskIds = userTasks.map(task => task.id);
+      const filteredEntries = entries.filter(entry => taskIds.includes(entry.task_id));
+
+      setTimeEntries(entries);
+      setCalendarEntries(filteredEntries);
+
+      if (calendarRef.current?.updateEntries) {
+        calendarRef.current.updateEntries(filteredEntries);
+      }
+    } catch (error) {
+      console.error('Error fetching time entries:', error);
+      setError('Error loading time entries from server');
+    } finally {
+      setIsLoadingEntries(false);
+    }
+  }, [user]);
+
   const fetchData = useCallback(async (token: string) => {
     if (!user) {
       return;
@@ -143,8 +180,7 @@ const Workspace: React.FC = () => {
     setIsLoading(true);
     try {
       const isElevated = hasElevatedPermissions();
-      const userColors = await fetchUsers(token);
-      const clientsData = await fetchClients(token);
+      await Promise.all([fetchUsers(token), fetchClients()]);
 
       const currentDate = new Date();
       const startDate = new Date(currentDate);
@@ -156,8 +192,8 @@ const Workspace: React.FC = () => {
 
       const allTasksData = await taskService.getAllTasks(startDate, endDate);
 
-      const allTasksConverted = await Promise.all(allTasksData.map(async (task: any) => {
-        const clientId = task.client_id !== undefined ? Number(task.client_id) : null;
+      const allTasksConverted = await Promise.all(allTasksData.map(async (task: Task) => {
+        const clientId = task.client_id !== undefined ? task.client_id : null;
         let clientName = 'Cliente no asignado';
         if (task.client) {
           clientName = task.client;
@@ -173,7 +209,7 @@ const Workspace: React.FC = () => {
           ...task,
           client_id: clientId,
           client_name: clientName
-        };
+        } as Task;
       }));
 
       setAllTasks(allTasksConverted);
@@ -181,19 +217,20 @@ const Workspace: React.FC = () => {
       if (isElevated) {
         const uniqueClientNames = [...new Set(allTasksConverted
           .filter(task => task.client)
-          .map(task => task.client))];
+          .map(task => task.client))] as string[]; // Add type assertion
 
-        const clientOptions = uniqueClientNames.map(clientName => ({
-          id: clientName,
-          label: clientName
-        }));
+        const clientOptions = uniqueClientNames
+          .filter(Boolean) // Remove any null/undefined values
+          .map(clientName => ({
+            id: clientName,
+            label: clientName
+          }));
 
         setAvailableClients(clientOptions);
-        setTasks(allTasksConverted);
         setFilteredTasks(allTasksConverted);
         setError(null);
 
-        fetchTimeEntries(allTasksConverted, userColors);
+        fetchTimeEntries(allTasksConverted);
         return;
       }
 
@@ -207,23 +244,20 @@ const Workspace: React.FC = () => {
             assignedTaskIds.includes(task.id)
           );
 
-          setTasks(filteredTasks);
           setFilteredTasks(filteredTasks);
           setError(null);
 
-          fetchTimeEntries(filteredTasks, userColors);
+          fetchTimeEntries(filteredTasks);
           return;
         } else {
-          setTasks([]);
           setFilteredTasks([]);
-          fetchTimeEntries([], userColors);
+          fetchTimeEntries([]);
         }
       } catch (error) {
         console.error('Error fetching assigned tasks:', error);
-        setTasks([]);
         setFilteredTasks([]);
         setError('Error fetching assigned tasks. Please try again later.');
-        fetchTimeEntries([], userColors);
+        fetchTimeEntries([]);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -235,7 +269,7 @@ const Workspace: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, hasElevatedPermissions, fetchUsers, router]);
+  }, [user, hasElevatedPermissions, fetchUsers, fetchClients, router]);
 
   useEffect(() => {
     const checkAuthAndFetchData = async () => {
@@ -275,55 +309,12 @@ const Workspace: React.FC = () => {
     checkAuthAndFetchData();
   }, [getToken, router, user, setUser, fetchData]);
 
-  const fetchTimeEntries = useCallback(async (
-    userTasks = filteredTasks, 
-    userColors = userColorMap,
-    startDate?: Date,
-    endDate?: Date
-  ) => {
-    if (!user) {
-      return;
-    }
-
-    setIsLoadingEntries(true);
-    try {
-      if (!startDate || !endDate) {
-        const currentDate = new Date();
-        startDate = new Date(currentDate);
-        startDate.setDate(currentDate.getDate() - currentDate.getDay());
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date(currentDate);
-        endDate.setDate(currentDate.getDate() + (6 - currentDate.getDay()));
-        endDate.setHours(23, 59, 59, 999);
-      }
-
-      const entries = await timeEntryService.getTimeEntriesByDateRange(startDate, endDate);
-
-      const taskIds = userTasks.map(task => task.id);
-
-      const filteredEntries = entries.filter(entry => taskIds.includes(entry.task_id));
-
-      setTimeEntries(entries);
-      setFilteredTimeEntries(filteredEntries);
-      setCalendarEntries(filteredEntries);
-
-      if (calendarRef.current && calendarRef.current.updateEntries) {
-        calendarRef.current.updateEntries(filteredEntries);
-      }
-    } catch (error) {
-      console.error('Error fetching time entries:', error);
-      setError('Error loading time entries from server');
-    } finally {
-      setIsLoadingEntries(false);
-    }
-  }, [user, filteredTasks, userColorMap]);
-
   const handleRefreshTimeEntries = useCallback(async (startDate?: Date, endDate?: Date) => {
     try {
       const token = getToken();
       await Promise.all([
         fetchUsers(token),
-        fetchClients(token)
+        fetchClients()
       ]);
 
       if (!startDate || !endDate) {
@@ -338,8 +329,8 @@ const Workspace: React.FC = () => {
 
       const allTasksData = await taskService.getAllTasks(startDate, endDate);
 
-      const allTasksConverted = await Promise.all(allTasksData.map(async (task: any) => {
-        const clientId = task.client_id !== undefined ? Number(task.client_id) : null;
+      const allTasksConverted = await Promise.all(allTasksData.map(async (task: Task) => {
+        const clientId = task.client_id !== undefined ? task.client_id : null;
         let clientName = 'Cliente no asignado';
         if (task.client) {
           clientName = task.client;
@@ -355,7 +346,7 @@ const Workspace: React.FC = () => {
           ...task,
           client_id: clientId,
           client_name: clientName
-        };
+        } as Task;
       }));
 
       setAllTasks(allTasksConverted);
@@ -374,7 +365,6 @@ const Workspace: React.FC = () => {
 
           const clientTimeEntries = allTimeEntries.filter(entry => taskIds.includes(entry.task_id));
 
-          setFilteredTimeEntries(clientTimeEntries);
           setCalendarEntries(clientTimeEntries);
           setFilteredTasks(clientTasks);
 
@@ -387,7 +377,6 @@ const Workspace: React.FC = () => {
           const taskIds = allTasksConverted.map(task => task.id);
           const allTaskTimeEntries = allTimeEntries.filter(entry => taskIds.includes(entry.task_id));
 
-          setFilteredTimeEntries(allTaskTimeEntries);
           setCalendarEntries(allTaskTimeEntries);
 
           if (calendarRef.current && calendarRef.current.updateEntries) {
@@ -411,18 +400,14 @@ const Workspace: React.FC = () => {
           const taskIds = userTasks.map(task => task.id);
           const userTimeEntries = allTimeEntries.filter(entry => taskIds.includes(entry.task_id));
 
-          setTasks(userTasks);
           setFilteredTasks(userTasks);
-          setFilteredTimeEntries(userTimeEntries);
           setCalendarEntries(userTimeEntries);
 
           if (calendarRef.current && calendarRef.current.updateEntries) {
             calendarRef.current.updateEntries(userTimeEntries);
           }
         } else {
-          setTasks([]);
           setFilteredTasks([]);
-          setFilteredTimeEntries([]);
           setCalendarEntries([]);
 
           if (calendarRef.current && calendarRef.current.updateEntries) {
@@ -436,7 +421,7 @@ const Workspace: React.FC = () => {
       console.error('Error refreshing time entries:', error);
       return false;
     }
-  }, [allTasks, selectedClient, hasElevatedPermissions, user, fetchUsers, fetchClients, getToken]);
+  }, [selectedClient, hasElevatedPermissions, user, fetchUsers, fetchClients, getToken, allTasks, timeEntries]);
 
   const handleTimeEntryCreate = async (entry: TimeEntry): Promise<void> => {
     try {
@@ -473,13 +458,10 @@ const Workspace: React.FC = () => {
 
     if (clientValue !== "all") {
       const clientTasks = allTasks.filter(task => task.client === clientValue);
-
       const taskIds = clientTasks.map(task => task.id);
-
       const clientTimeEntries = timeEntries.filter(entry => taskIds.includes(entry.task_id));
 
       setFilteredTasks(clientTasks);
-      setFilteredTimeEntries(clientTimeEntries);
       setCalendarEntries(clientTimeEntries);
 
       if (calendarRef.current && calendarRef.current.updateEntries) {
@@ -487,11 +469,9 @@ const Workspace: React.FC = () => {
       }
     } else {
       setFilteredTasks(allTasks);
-
       const taskIds = allTasks.map(task => task.id);
       const allTaskTimeEntries = timeEntries.filter(entry => taskIds.includes(entry.task_id));
 
-      setFilteredTimeEntries(allTaskTimeEntries);
       setCalendarEntries(allTaskTimeEntries);
 
       if (calendarRef.current && calendarRef.current.updateEntries) {

@@ -2,7 +2,6 @@
 
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 export default function Sidebar() {
   const { user } = useAuthStore();

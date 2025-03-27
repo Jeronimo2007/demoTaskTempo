@@ -16,24 +16,26 @@ moment.locale('es');
 
 const localizer = momentLocalizer(moment);
 
-interface TimeEntryCalendarProps {
+interface CalendarProps {
   apiTimeEntries: TimeEntryResponse[];
   tasks: Task[];
-  isLoading?: boolean;
-  onRefresh?: (startDate?: Date, endDate?: Date) => void;
-  onTimeEntryCreate?: (entry: { taskId: number; start_time: Date; end_time: Date; description: string }) => Promise<any>; // Updated to include description
-  // Props for user information
-  userMap?: Record<number, string> | ((userId: number) => string); // Map of user_id to name or function to get name
-  currentUserId?: number; // ID of the currently logged-in user
-  // Optional prop to fetch users if userMap is not provided
-  fetchUsers?: () => Promise<Record<number, string>>;
-  // New prop for user color mapping
-  userColorMap?: Record<number, string>;
+  isLoading: boolean;
+  onRefresh: (startDate?: Date, endDate?: Date) => Promise<boolean>;
+  onTimeEntryCreate: (entry: TimeEntry) => Promise<void>;
+  userMap: (userId: number) => string;
+  currentUserId?: number;
+  userColorMap: Record<number, string>;
 }
 
-// Define imperative handle interface for ref
-export interface TimeEntryCalendarHandle {
+export interface CalendarRef {
   updateEntries: (entries: TimeEntryResponse[]) => void;
+}
+
+interface TimeEntry {
+  taskId: number;
+  start_time: Date;
+  end_time: Date;
+  description?: string;
 }
 
 // Tipo personalizado para nuestros eventos de calendario
@@ -57,17 +59,18 @@ interface ToolbarProps {
   onView: (view: View) => void;
 }
 
-const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarProps>(({ 
-  apiTimeEntries: initialTimeEntries, 
-  tasks, 
-  isLoading = false,
-  onRefresh,
-  onTimeEntryCreate,
-  userMap: initialUserMap = {},
-  currentUserId,
-  fetchUsers,
-  userColorMap = {} // Default to empty object if not provided
-}, ref) => {
+const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) => {
+  const { 
+    apiTimeEntries: initialTimeEntries, 
+    tasks, 
+    isLoading = false,
+    onRefresh,
+    onTimeEntryCreate,
+    userMap: initialUserMap = {},
+    currentUserId,
+    userColorMap = {} // Default to empty object if not provided
+  } = props;
+
   // State for time entries that can be updated via ref
   const [apiTimeEntries, setApiTimeEntries] = useState<TimeEntryResponse[]>(initialTimeEntries);
   // State for current date in calendar
@@ -97,7 +100,7 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   
   // Estado para el mapa de usuarios (para mantener nombres)
-  const [userMap, setUserMap] = useState<Record<number, string>>(
+  const [userMap] = useState<Record<number, string>>(
     typeof initialUserMap === 'function' ? {} : initialUserMap
   );
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -145,28 +148,15 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
     fetchTimeEntriesForWeek(currentDate);
   }, [currentDate, fetchTimeEntriesForWeek]);
 
-  // Efecto para cargar los usuarios si es necesario
+  // Efecto para cargar los usuarios si es necesario - can be removed since we're not using setUserMap
   useEffect(() => {
     const loadUsers = async () => {
-      // Si ya tenemos un mapa de usuarios poblado, no necesitamos hacer nada
       if (Object.keys(userMap).length > 0) return;
-      
-      // Si no hay una función para obtener usuarios, no podemos cargarlos
-      if (!fetchUsers) return;
-      
-      try {
-        setLoadingUsers(true);
-        const users = await fetchUsers();
-        setUserMap(users);
-      } catch (err) {
-        console.error('Error al cargar información de usuarios:', err);
-      } finally {
-        setLoadingUsers(false);
-      }
+      setLoadingUsers(false);
     };
     
     loadUsers();
-  }, [fetchUsers, userMap]);
+  }, [userMap]);
 
   // Función auxiliar para obtener nombre de usuario
   const getUserName = useCallback((userId: number): string => {
@@ -269,22 +259,6 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
       }
     }
   }, [currentDate, onRefresh]);
-  
-  // Function to get the current date range based on the calendar view
-  const getCurrentDateRange = useCallback(() => {
-    // Use the current calendar date as reference
-    const date = currentDate;
-    
-    // Calculate start of the week (Sunday)
-    const startDate = moment(date).startOf('week').toDate();
-    
-    // Calculate end of the week (Saturday)
-    const endDate = moment(date).endOf('week').toDate();
-    
-    console.log(`📅 Current date range: ${moment(startDate).format('DD/MM/YYYY')} to ${moment(endDate).format('DD/MM/YYYY')}`);
-    
-    return { startDate, endDate };
-  }, [currentDate]);
 
   // Handler para crear una nueva entrada de tiempo
   const handleCreateTimeEntry = useCallback(async (data: { taskId: number, start: Date, end: Date, description: string }) => {
@@ -417,7 +391,7 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
         </div>
         {descriptionPreview && (
           <div style={{ fontSize: '0.8em', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-            "{descriptionPreview}"
+            &quot;{descriptionPreview}&quot;
           </div>
         )}
         <div style={{ fontSize: '0.8em', fontStyle: 'italic' }}>
@@ -442,8 +416,6 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
     };
 
     const handleRefresh = async () => {
-      if (!onRefresh) return;
-
       console.log('🔄 Calendar refresh button clicked');
       setLoadingEntries(true);
 
@@ -507,16 +479,14 @@ const TimeEntryCalendar = forwardRef<TimeEntryCalendarHandle, TimeEntryCalendarP
           >
             Semana
           </button>
-          {onRefresh && (
-            <button 
-              type="button" 
-              onClick={handleRefresh} 
-              className="toolbar-btn refresh-btn"
-              disabled={isLoading || loadingUsers || loadingEntries}
-            >
-              <FaSync className={(isLoading || loadingUsers || loadingEntries) ? 'animate-spin' : ''} />
-            </button>
-          )}
+          <button 
+            type="button" 
+            onClick={handleRefresh} 
+            className="toolbar-btn refresh-btn"
+            disabled={isLoading || loadingUsers || loadingEntries}
+          >
+            <FaSync className={(isLoading || loadingUsers || loadingEntries) ? 'animate-spin' : ''} />
+          </button>
         </div>
       </div>
     );

@@ -23,7 +23,6 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   if (!isOpen) return null;
 

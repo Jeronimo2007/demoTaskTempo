@@ -43,7 +43,7 @@ export interface ClientResponse {
   city?: string;
   address?: string;
   email?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;  // Replace any with union type
 }
 
 // Define interfaces for create and update operations
@@ -374,6 +374,16 @@ const clientService = {
     
     console.log(`✅ Returning ${Object.keys(result).length} clients from batch request`);
     return result;
+  }
+};
+
+export const getClientName = async (clientId: number): Promise<string> => {
+  try {
+    const response = await axios.get<ClientResponse>(`${API_URL}/clients/${clientId}`);
+    return response.data.name || response.data.nombre || response.data.client_name || `Cliente ${clientId}`;
+  } catch (error) {
+    console.error(`Error fetching client name for ID ${clientId}:`, error);
+    return `Cliente ${clientId}`;
   }
 };
 

@@ -51,7 +51,7 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
     try {
       const date = new Date(dateString);
       return format(date, 'dd MMM yyyy', { locale: es });
-    } catch (error) {
+    } catch {
       return dateString;
     }
   };
@@ -79,15 +79,15 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
       });
 
       setInvoices(response.data);
-    } catch (error) {
-      console.error('Error al obtener el registro de facturas:', error);
+    } catch (err) {
+      console.error('Error al obtener el registro de facturas:', err);
       
       let message = 'Error al cargar el registro de facturas';
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) {
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 401) {
           message = 'No autorizado. Verifique su sesión e intente nuevamente.';
         } else {
-          message = `Error ${error.response?.status || 'desconocido'}: ${error.message}`;
+          message = `Error ${err.response?.status || 'desconocido'}: ${err.message}`;
         }
       }
       
