@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlay, FaPause, FaStop, FaSave, FaSync } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
-import { Task } from '@/types/task'; // Import Task from types file
+import { Task } from '@/types/task';
 
 type TimeEntry = {
   id?: number;
@@ -200,12 +200,11 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
     if (isRunning) {
       timerIntervalRef.current = window.setInterval(() => {
         elapsedTimeRef.current += 1;
-        const newDisplayTime = elapsedTimeRef.current;
-        setDisplayTime(newDisplayTime);
+        setDisplayTime(elapsedTimeRef.current);
         
         // Update references for persistence
         timerStateRef.current.elapsedTime = elapsedTimeRef.current;
-        timerStateRef.current.displayTime = newDisplayTime;
+        timerStateRef.current.displayTime = elapsedTimeRef.current;
       }, 1000);
     }
     
@@ -244,7 +243,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
         y: Math.max(0, Math.min(newY, maxY))
       });
     }
-  }, [isDragging, dragOffset.x, dragOffset.y, timerRef]);
+  }, [isDragging, dragOffset.x, dragOffset.y]);
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -267,14 +266,20 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
   }, [isDragging, handleMouseMove]);
 
   // Timer control functions
+  // Show error message with timeout
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    
+    // Clear error message after 3 seconds
+    if (errorTimeout) clearTimeout(errorTimeout);
+    const timeout = setTimeout(() => setErrorMessage(null), 3000);
+    setErrorTimeout(timeout);
+  };
+
+  // Timer control functions
   const handleStart = () => {
     if (selectedTaskId === null) {
-      setErrorMessage("Por favor primero selecciona una tarea");
-      
-      // Clear error message after 3 seconds
-      if (errorTimeout) clearTimeout(errorTimeout);
-      const timeout = setTimeout(() => setErrorMessage(null), 3000);
-      setErrorTimeout(timeout);
+      showError("Por favor primero selecciona una tarea");
       return;
     }
     
@@ -356,12 +361,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           setErrorMessage(null);
         } catch (err) {
           console.error('Error saving time entry:', err);
-          setErrorMessage("Failed to save time entry to server");
-          
-          // Clear error message after 3 seconds
-          if (errorTimeout) clearTimeout(errorTimeout);
-          const timeout = setTimeout(() => setErrorMessage(null), 3000);
-          setErrorTimeout(timeout);
+          showError("Failed to save time entry to server");
         } finally {
           // Reset timer
           setIsSaving(false);
@@ -496,7 +496,6 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
 
   // Helper function to get client name from task
   const getClientName = (task: Task): string => {
-    // Try different client name properties that might exist
     if (task.client_name) return task.client_name;
     if (task.client) return task.client;
     return 'Sin cliente';
@@ -575,7 +574,7 @@ const FloatingTimer: React.FC<FloatingTimerProps> = ({ tasks, onTimeEntryCreate,
           />
           
           <div className="text-center text-xl font-bold mb-3 text-black">
-            {formatTime(displayTime)} {/* Changed to use displayTime */}
+            {formatTime(displayTime)}
           </div>
           
           {startTime && (

@@ -1,12 +1,11 @@
-
 'use client'
 
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSave, faTrash, faTimes, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faSave, faTrash, faTimes, faPlus, faFilter } from "@fortawesome/free-solid-svg-icons";
 import ClientSection from "@/components/ClientSection"; 
 import ReportDownload from "@/components/ReportDownload";
 
@@ -46,12 +45,19 @@ const AREA_OPTIONS = [
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// Utility function to normalize IDs for consistent comparison
+const stringifyId = (id: any): string => {
+  if (id === null || id === undefined) return '';
+  return String(id).trim();
+};
+
 export default function AdminPanel() {
-  const { user, setUser } = useAuthStore(); // Prefixed with underscore to indicate intentionally unused
+  const { user, setUser } = useAuthStore();
   const router = useRouter();
 
   const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [clients, setClients] = useState<ClientData[]>([]); 
+  const [clients, setClients] = useState<ClientData[]>([]);
+  const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -68,6 +74,8 @@ export default function AdminPanel() {
   const [taskModal, setTaskModal] = useState({
     isOpen: false
   });
+  // Client filter state
+  const [clientFilter, setClientFilter] = useState<string>("");
 
   // Helper function to check if a client is permanent
   const isClientPermanent = useCallback((clientId: number) => {
@@ -81,13 +89,35 @@ export default function AdminPanel() {
     return statusObj?.color || "bg-gray-300";
   };
 
-  // Get token from cookie instead of localStorage to be consistent with useAuthStore
+  // Get token from cookie
   const getToken = useCallback(() => {
     return document.cookie
       .split('; ')
       .find((row) => row.startsWith('token='))
       ?.split('=')[1] || "";
   }, []);
+
+  // Function to fetch user data with token
+  const fetchUserData = useCallback(async (token: string) => {
+    try {
+      setIsLoadingUser(true);
+      const response = await axios.get(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (response.data) {
+        // Update store with user data
+        setUser(response.data, token);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error al recuperar datos del usuario:", error);
+      return false;
+    } finally {
+      setIsLoadingUser(false);
+    }
+  }, [API_URL, setUser]);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -107,41 +137,120 @@ export default function AdminPanel() {
       const response = await axios.get(`${API_URL}/tasks/get_task`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log("Tasks fetched:", response.data); // Debug log
       setTasks(response.data);
     } catch (error) {
       console.error("Error al obtener las tareas:", error);
     }
   }, [getToken]);
 
-
-  // This effect runs on initial load and when clientsUpdated changes
-  useEffect(() => {
-    // Get token from cookie to be consistent with useAuthStore
-    const cookieToken = document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('token='))
-      ?.split('=')[1];
+  // Debug function to inspect data structures
+  const debugDataStructure = useCallback(() => {
+    console.log("%c=== DATOS DE DEPURACIÓN ===", "color: blue; font-weight: bold");
     
-    if (cookieToken) {
-      // If we have a token in the cookie but no user in the store,
-      // we need to fetch the user data or redirect to login
-      if (!user) {
+    // Examine task structure
+    if (tasks.length > 0) {
+      console.log("%cEjemplo de tarea:", "font-weight: bold");
+      console.log(tasks[0]);
+      console.log("%cTipos de datos en client_id:", "font-weight: bold");
+      
+      // Create a map of client_id types found
+      const idTypes = tasks.reduce((acc, task) => {
+        const type = typeof task.client_id;
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      console.log(idTypes);
+      
+      // Show client_id values
+      console.log("%cValores de client_id en tareas:", "font-weight: bold");
+      tasks.forEach(task => {
+        console.log(`Tarea ${task.id}: client_id=${task.client_id} (${typeof task.client_id}), client=${task.client}`);
+      });
+    } else {
+      console.log("No hay tareas disponibles para depurar");
+    }
+    
+    // Examine client structure
+    if (clients.length > 0) {
+      console.log("%cEjemplo de cliente:", "font-weight: bold");
+      console.log(clients[0]);
+      console.log("%cTipos de datos en id de clientes:", "font-weight: bold");
+      
+      // Create a map of id types found
+      const idTypes = clients.reduce((acc, client) => {
+        const type = typeof client.id;
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      console.log(idTypes);
+      
+      // Show id values
+      console.log("%cValores de id en clientes:", "font-weight: bold");
+      clients.forEach(client => {
+        console.log(`Cliente: ${client.name}, id=${client.id} (${typeof client.id})`);
+      });
+    } else {
+      console.log("No hay clientes disponibles para depurar");
+    }
+    
+    console.log("%c=== FIN DATOS DE DEPURACIÓN ===", "color: blue; font-weight: bold");
+  }, [tasks, clients]);
+
+
+  // Effect to handle authentication and session recovery
+  useEffect(() => {
+    const initializeSession = async () => {
+      const token = getToken();
+      
+      // If there's a token but no user, try to recover the session
+      if (token && !user && !isLoadingUser) {
+        console.log("Token detectado, recuperando sesión...");
+        const success = await fetchUserData(token);
+        
+        if (!success) {
+          console.log("No se pudo recuperar la sesión, redirigiendo al login");
+          router.push("/");
+          return;
+        }
+      } 
+      // If no token, redirect to login
+      else if (!token) {
+        console.log("No hay token, redirigiendo al login");
         router.push("/");
         return;
       }
-    } else {
-      // No token in cookie, redirect to login
-      router.push("/");
-      return;
-    }
-  
-    if (!user || !["socio", "senior", "consultor"].includes(user.role)) {
-      router.push("/");
-    } else {
-      fetchClients();
-      fetchTasks();
-    }
-  }, [user, router, fetchClients, fetchTasks, clientsUpdated, setUser]);
+      
+      // If we have a valid user, load data
+      if (user && ["socio", "senior", "consultor"].includes(user.role)) {
+        console.log("Usuario válido, cargando datos...");
+        
+        // Fetch clients and tasks only once when the session is initialized
+        if (clients.length === 0) {
+          fetchClients();
+        }
+        if (tasks.length === 0) {
+          fetchTasks();
+        }
+        
+        // Run debugging after data is loaded
+        const timer = setTimeout(() => {
+          debugDataStructure();
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      } else if (user) {
+        // User with invalid role
+        console.log("Usuario con rol no válido");
+        router.push("/");
+      }
+    };
+    
+    initializeSession();
+    // Removed unnecessary dependencies to prevent infinite calls
+  }, [user, router, getToken, fetchUserData, clients.length, tasks.length, isLoadingUser]);
 
   // Function to be passed to ClientSection to notify when clients are updated
   const handleClientUpdate = useCallback(() => {
@@ -295,6 +404,129 @@ export default function AdminPanel() {
     setUpdateError(null);
   };
 
+  // Filter tasks based on selected client with multiple comparison strategies
+  const filteredTasks = useMemo(() => {
+    if (!clientFilter) {
+      return tasks;
+    }
+    
+    // Debug filter process
+    console.log("%c=== DEPURACIÓN DE FILTRO ===", "color: green; font-weight: bold");
+    console.log(`Filtrando por cliente: ${clientFilter}`);
+    
+    // Strategy 1: Strict comparison after string normalization
+    const strictFiltered = tasks.filter(task => {
+      // Normalize both values to string for comparison
+      const taskClientIdStr = stringifyId(task.client_id);
+      const filterClientIdStr = stringifyId(clientFilter);
+      
+      return taskClientIdStr === filterClientIdStr;
+    });
+    
+    console.log(`Resultados con comparación estricta: ${strictFiltered.length}`);
+    
+    // If strict comparison returns no results, try more flexible approaches
+    if (strictFiltered.length === 0) {
+      console.log("Intentando comparación flexible...");
+      
+      // Strategy 2: Comparison after converting both to numbers
+      const flexFiltered = tasks.filter(task => {
+        // Convert to number if possible
+        const taskClientId = Number(task.client_id);
+        const filterClientId = Number(clientFilter);
+        
+        // Check if they are valid numbers before comparing
+        if (!isNaN(taskClientId) && !isNaN(filterClientId)) {
+          return taskClientId === filterClientId;
+        }
+        return false;
+      });
+      
+      console.log(`Resultados con comparación numérica: ${flexFiltered.length}`);
+      
+      // Strategy 3: Search by client name
+      if (flexFiltered.length === 0) {
+        console.log("Intentando búsqueda por nombre de cliente...");
+        
+        // Find the selected client to get its name
+        const selectedClient = clients.find(c => stringifyId(c.id) === stringifyId(clientFilter));
+        
+        if (selectedClient) {
+          const nameFiltered = tasks.filter(task => {
+            // Check if the task's client name includes the selected client's name
+            return task.client && task.client.includes(selectedClient.name);
+          });
+          
+          console.log(`Resultados con búsqueda por nombre: ${nameFiltered.length}`);
+          
+          if (nameFiltered.length > 0) {
+            console.log("Usando resultados de búsqueda por nombre");
+            return nameFiltered;
+          }
+        }
+      }
+      
+      console.log("Usando resultados de comparación numérica");
+      return flexFiltered;
+    }
+    
+    console.log("Usando resultados de comparación estricta");
+    console.log("%c=== FIN DEPURACIÓN DE FILTRO ===", "color: green; font-weight: bold");
+    return strictFiltered;
+  }, [tasks, clientFilter, clients]);
+
+  // Debug: Log when filtered tasks change
+  useEffect(() => {
+    console.log("Filtered tasks count:", filteredTasks?.length);
+  }, [filteredTasks]);
+
+  // Handle client filter change with enhanced debugging
+  const handleClientFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    console.log("%c=== CAMBIO DE FILTRO ===", "color: purple; font-weight: bold");
+    console.log(`Valor seleccionado: "${value}" (${typeof value})`);
+    
+    if (value) {
+      // Find the selected client for debugging
+      const selectedClient = clients.find(c => stringifyId(c.id) === stringifyId(value));
+      console.log("Cliente seleccionado:", selectedClient);
+      
+      // Check for possible matches
+      const possibleMatches = tasks.filter(task => {
+        return stringifyId(task.client_id) === stringifyId(value) || 
+               Number(task.client_id) === Number(value);
+      });
+      
+      console.log(`Posibles coincidencias encontradas: ${possibleMatches.length}`);
+      possibleMatches.forEach(task => {
+        console.log(`- Tarea: ${task.title}, client_id: ${task.client_id} (${typeof task.client_id})`);
+      });
+    }
+    
+    console.log("%c=== FIN CAMBIO DE FILTRO ===", "color: purple; font-weight: bold");
+    setClientFilter(value);
+    
+    // Run data structure debugging when filter changes
+    setTimeout(debugDataStructure, 500);
+  };
+
+  // Reset client filter
+  const clearClientFilter = () => {
+    setClientFilter("");
+  };
+
+  // Show loading indicator while recovering user
+  if (isLoadingUser) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Recuperando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return <p>Cargando...</p>;
 
   return (
@@ -324,6 +556,41 @@ export default function AdminPanel() {
         )}
 
         <h2 className="text-lg font-semibold mb-3">Lista de Tareas</h2>
+        
+        {/* Client Filter - Minimalist Version */}
+        <div className="mb-4 flex items-center space-x-3">
+          <div className="flex items-center">
+            <FontAwesomeIcon icon={faFilter} className="mr-2 text-gray-600" />
+            <span className="text-sm">Cliente:</span>
+          </div>
+          <select
+            value={clientFilter}
+            onChange={handleClientFilterChange}
+            className="border p-2 rounded"
+          >
+            <option value="">Todos los clientes</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+          {clientFilter && (
+            <button 
+              onClick={clearClientFilter}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Limpiar
+            </button>
+          )}
+          
+          {/* Debug info - can be removed in production */}
+          <span className="text-xs text-gray-500">
+            {clientFilter ? `Filtrando por cliente ID: ${clientFilter}` : 'Mostrando todas las tareas'}
+            {` (${filteredTasks.length} tareas)`}
+          </span>
+        </div>
+        
         <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
           <thead className="bg-gray-100">
             <tr>
@@ -337,10 +604,11 @@ export default function AdminPanel() {
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
-              const isPermanent = isClientPermanent(task.client_id);
-              
-              return (
+            {filteredTasks.length > 0 ? (
+              filteredTasks.map((task) => {
+                const isPermanent = isClientPermanent(task.client_id);
+                
+                return (
                 <tr key={task.id} className="hover:bg-gray-50">
                   <td className="border-b border-black p-2">
                     {editingTaskId === task.id ? (
@@ -450,7 +718,14 @@ export default function AdminPanel() {
                   </td>
                 </tr>
               );
-            })}
+            })
+            ) : (
+              <tr>
+                <td colSpan={7} className="text-center py-4 text-gray-500">
+                  {clientFilter ? "No hay tareas para el cliente seleccionado" : "No hay tareas disponibles"}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

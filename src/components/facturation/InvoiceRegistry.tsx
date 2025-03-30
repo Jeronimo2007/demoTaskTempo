@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { format, subMonths } from 'date-fns';
@@ -15,6 +16,21 @@ interface Invoice {
   total_hours: number | null;
   total_case_value: number | null;
   client_name: string;
+  client_id: number | null;
+}
+
+interface Client {
+  id: number;
+  name: string;
+  total_time?: number;
+  permanent?: boolean;
+  monthly_limit_hours?: number;
+  current_month_hours?: number;
+  nit?: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+  email?: string;
 }
 
 interface InvoiceRegistryProps {
@@ -34,8 +50,17 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
   
   // Estado para las facturas y carga
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Estado para los clientes
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [loadingClients, setLoadingClients] = useState<boolean>(false);
+  
+  // Estado para mostrar el mensaje de advertencia de client_id
+  const [showClientIdWarning, setShowClientIdWarning] = useState<boolean>(false);
 
   // Función para formatear moneda
   const formatCurrency = (amount: number): string => {
@@ -55,6 +80,40 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
       return dateString;
     }
   };
+
+  // Función para cargar los clientes
+  const fetchClients = useCallback(async () => {
+    if (!token || !apiUrl) {
+      return;
+    }
+    
+    setLoadingClients(true);
+    
+    try {
+      const response = await axios.get(`${apiUrl}/clients/get_clients_admin`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (Array.isArray(response.data)) {
+        setClients(response.data);
+      }
+    } catch (err) {
+      console.error('Error al obtener la lista de clientes:', err);
+      // No mostramos notificación para no interferir con la UI principal
+    } finally {
+      setLoadingClients(false);
+    }
+  }, [token, apiUrl]);
+
+  // Cargar clientes una sola vez al montar el componente
+  useEffect(() => {
+    if (token && apiUrl) {
+      fetchClients();
+    }
+  }, [token, apiUrl, fetchClients]);
 
   // Función para obtener el registro de facturas
   const fetchInvoiceRegistry = useCallback(async () => {
@@ -78,7 +137,42 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
         }
       });
 
-      setInvoices(response.data);
+      // Procesar las facturas para asignar client_id a partir del client_name si es necesario
+      const processedInvoices = response.data.map((invoice: any) => {
+        // Si no hay client_id, pero hay client_name, intentamos buscar el cliente por nombre
+        if ((invoice.client_id === undefined || invoice.client_id === null) && invoice.client_name) {
+          // Buscar el cliente por nombre
+          const matchingClient = clients.find(client => 
+            client.name.toLowerCase() === invoice.client_name.toLowerCase()
+          );
+          
+          if (matchingClient) {
+            return {
+              ...invoice,
+              client_id: matchingClient.id
+            };
+          } else {
+            return invoice; // Mantener null si no se encuentra coincidencia
+          }
+        }
+        return invoice;
+      });
+
+      // Verificar si alguna factura tiene client_id null
+      const hasNullClientIds = processedInvoices.some((inv: any) => inv.client_id === null);
+      setShowClientIdWarning(hasNullClientIds);
+
+      setInvoices(processedInvoices);
+      
+      // Si hay un cliente seleccionado, filtrar las facturas
+      if (selectedClientId !== null) {
+        const filtered = processedInvoices.filter((invoice: any) => {
+          return invoice.client_id === selectedClientId;
+        });
+        setFilteredInvoices(filtered);
+      } else {
+        setFilteredInvoices(processedInvoices);
+      }
     } catch (err) {
       console.error('Error al obtener el registro de facturas:', err);
       
@@ -96,14 +190,14 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
     } finally {
       setLoading(false);
     }
-  }, [token, apiUrl, startDate, endDate, showNotification]);
+  }, [token, apiUrl, startDate, endDate, selectedClientId, clients, showNotification]);
 
   // Cargar facturas cuando cambian las fechas
   useEffect(() => {
     if (token && apiUrl) {
       fetchInvoiceRegistry();
     }
-  }, [token, apiUrl, fetchInvoiceRegistry]); // Añadimos fetchInvoiceRegistry como dependencia
+  }, [token, apiUrl, fetchInvoiceRegistry]);
 
   // Función para manejar la búsqueda con las fechas seleccionadas
   const handleSearch = (e: React.FormEvent) => {
@@ -129,18 +223,40 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
     return types[type] || type;
   };
 
+  // Función para manejar el cambio de cliente
+  const handleClientChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    const clientId = value ? Number(value) : null;
+    setSelectedClientId(clientId);
+    
+    // Filtrar las facturas por el cliente seleccionado
+    if (clientId !== null) {
+      const filtered = invoices.filter(invoice => invoice.client_id === clientId);
+      setFilteredInvoices(filtered);
+    } else {
+      setFilteredInvoices(invoices);
+    }
+  };
+
+  // Función para filtrar las facturas que tienen client_id null
+  const handleShowOnlyMissingClientIds = () => {
+    const filtered = invoices.filter(invoice => invoice.client_id === null);
+    setFilteredInvoices(filtered);
+    setSelectedClientId(null);
+  };
+
   return (
     <div className="bg-white rounded-lg border shadow-sm p-6 mt-8">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-black">Registro de Facturas</h2>
+        <h2 className="text-xl font-semibold text-black">Registro de ordenes</h2>
         <p className="text-black text-sm">
-          Consulta las facturas generadas en un período específico.
+          Consulta las ordenes generadas en un período específico.
         </p>
       </div>
 
       {/* Formulario de búsqueda */}
       <form onSubmit={handleSearch} className="mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="space-y-2">
             <label htmlFor="start-date" className="block text-sm font-medium text-black">
               Fecha Inicial
@@ -169,6 +285,30 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
             />
           </div>
           
+          <div className="space-y-2">
+            <label htmlFor="client-filter" className="block text-sm font-medium text-black">
+              Filtrar por Cliente
+            </label>
+            <select
+              id="client-filter"
+              value={selectedClientId === null ? '' : selectedClientId}
+              onChange={handleClientChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+              disabled={loadingClients}
+            >
+              <option value="">Todos los clientes</option>
+              {loadingClients ? (
+                <option disabled>Cargando clientes...</option>
+              ) : (
+                clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          
           <div className="flex items-end">
             <button
               type="submit"
@@ -187,6 +327,20 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
       {errorMessage && (
         <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
           <p>{errorMessage}</p>
+        </div>
+      )}
+
+      {/* Advertencia de client_id nulos */}
+      {showClientIdWarning && (
+        <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
+          <p className="font-medium">Advertencia: Algunas órdenes no tienen ID de cliente asignado.</p>
+          <p className="text-sm mt-1">Esto puede afectar el funcionamiento del filtro por cliente.</p>
+          <button 
+            onClick={handleShowOnlyMissingClientIds}
+            className="mt-2 px-2 py-1 text-xs bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
+          >
+            Mostrar solo órdenes sin ID de cliente
+          </button>
         </div>
       )}
 
@@ -222,23 +376,29 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
             {loading ? (
               <tr>
                 <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
-                  Cargando facturas...
+                  Cargando ordenes...
                 </td>
               </tr>
-            ) : invoices.length === 0 ? (
+            ) : filteredInvoices.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
-                  No se encontraron facturas en el período seleccionado
+                  No se encontraron ordenes en el período seleccionado
+                  {selectedClientId !== null && " o para el cliente seleccionado"}
                 </td>
               </tr>
             ) : (
-              invoices.map((invoice) => (
-                <tr key={invoice.id}>
+              filteredInvoices.map((invoice) => (
+                <tr key={invoice.id} className={invoice.client_id === null ? "bg-yellow-50" : ""}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(invoice.issued_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {invoice.client_name}
+                    {invoice.client_id === null ? (
+                      <span className="ml-1 text-xs text-red-500">(Sin ID)</span>
+                    ) : (
+                      <span className="ml-1 text-xs text-gray-400">(ID: {invoice.client_id})</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {getBillingTypeText(invoice.billing_type)}

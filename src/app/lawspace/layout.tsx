@@ -5,7 +5,7 @@ import Sidebar from "../../components/Sidebar";
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { getUserData } from '@/services/authService';
-import FloatingTimer from '@/components/FloatingTimer';
+import TimerSidebar from '@/components/TimerSidebar';
 import taskService from '@/services/taskService';
 import timeEntryService from '@/services/timeEntryService';
 import { Task } from '@/types/task';
@@ -217,7 +217,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="p-6 min-h-screen">{children}</main>
         
         {!isLoading && tasks.length > 0 && (
-          <FloatingTimer
+          <TimerSidebar
             tasks={tasks}
             onTimeEntryCreate={handleTimeEntryCreate}
             onEntryCreated={handleEntryCreated}
