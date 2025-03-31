@@ -3,6 +3,7 @@ import moment from 'moment';
 import { FaTimes, FaTrash } from 'react-icons/fa';
 import { TimeEntryResponse } from '@/services/timeEntryService';
 import { Task } from '@/types/task'; // Import the shared Task interface
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface TimeEntryDetailsModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface TimeEntryDetailsModalProps {
   creatorName?: string;
   onDelete: (entryId: number) => Promise<void>;
 }
+
+const ELEVATED_ROLES = ['senior', 'socio'];
 
 const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
   isOpen,
@@ -23,6 +26,21 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const authUser = useAuthStore(state => state.user);
+
+  // Function to check if user has permission to delete
+  const canDeleteEntry = () => {
+    if (!authUser) return false;
+    
+    const userRole = authUser.role.toLowerCase();
+    const isElevatedRole = ELEVATED_ROLES.includes(userRole);
+    
+    // If user has elevated role, they can delete any entry
+    if (isElevatedRole) return true;
+    
+    // For other roles, they can only delete their own entries
+    return timeEntry.user_id === Number(authUser.id);
+  };
 
   if (!isOpen) return null;
 
@@ -44,6 +62,11 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
   };
 
   const handleDelete = async () => {
+    if (!canDeleteEntry()) {
+      setError('No tienes permisos para eliminar esta entrada de tiempo');
+      return;
+    }
+
     if (window.confirm('¿Estás seguro de que deseas eliminar esta entrada de tiempo?')) {
       setIsDeleting(true);
       setError(null);
@@ -112,24 +135,26 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
             </div>
           )}
 
-          <div className="flex justify-end mt-6">
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-b-2 border-white rounded-full"></div>
-                  Eliminando...
-                </>
-              ) : (
-                <>
-                  <FaTrash className="mr-2" /> Eliminar
-                </>
-              )}
-            </button>
-          </div>
+          {canDeleteEntry() && (
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 mr-2 border-b-2 border-white rounded-full"></div>
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <FaTrash className="mr-2" /> Eliminar
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

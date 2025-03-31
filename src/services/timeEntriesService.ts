@@ -87,13 +87,29 @@ export class TimeEntriesService {
    * @param id ID del time entry a eliminar
    * @returns Promise que se resuelve cuando la operación es exitosa
    */
-  async deleteTimeEntry(id: string): Promise<void> {
+  async deleteTimeEntry(id: string, currentUserRole: string, timeEntryOwner: string): Promise<void> {
+    if (!this.isAuthorizedToDelete(currentUserRole, timeEntryOwner)) {
+      throw new Error('Unauthorized to delete this time entry');
+    }
+
     try {
       await axios.delete(`${this.baseUrl}/time-entries/${id}`);
     } catch (error) {
       console.error('Error deleting time entry:', error);
       throw error;
     }
+  }
+
+  private isAuthorizedToDelete(currentUserRole: string, timeEntryOwner: string): boolean {
+    if (currentUserRole === 'Senior' || currentUserRole === 'Socio') {
+      return true;
+    }
+
+    if (currentUserRole === 'Junior Auxiliar' || currentUserRole === 'Consultor') {
+      return currentUserRole === timeEntryOwner;
+    }
+
+    return false;
   }
 }
 

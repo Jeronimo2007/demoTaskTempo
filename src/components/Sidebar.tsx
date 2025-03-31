@@ -38,7 +38,7 @@ export default function Sidebar() {
         >
           Dashboard
         </button>)}
-        {user && ['admin', 'socio', 'senior'].includes(user.role) && (
+        {user && ['admin', 'socio', 'senior', 'consultor'].includes(user.role) && (
         <button
           onClick={() => router.push("/lawspace/dashboard/admin_panel")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"

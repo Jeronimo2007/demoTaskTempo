@@ -557,7 +557,7 @@ const Workspace: React.FC = () => {
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="text-gray-500 p-4 text-center bg-gray-50 rounded-lg border border-gray-100">
-            No hay tareas disponibles. {!hasElevatedPermissions() && "Contacta a un abogado senior o socio para que te asignen tareas."}
+            No hay tareas disponibles. {!hasElevatedPermissions() && "Crea una tarea o contacta a un abogado senior o socio para que te asigne una."}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

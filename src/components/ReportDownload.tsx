@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuthStore } from '@/store/useAuthStore';
 import axios from 'axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -10,6 +11,11 @@ type ReportDownloadProps = {
 };
 
 const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
+  const user = useAuthStore((state) => state.user);
+
+  if (user?.role === 'consultor') {
+    return null;
+  }
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [selectedClientId, setSelectedClientId] = useState('');
