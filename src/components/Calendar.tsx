@@ -340,7 +340,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       style: {
         backgroundColor: event.color || '#cccccc',
         borderRadius: '4px',
-        opacity: isCurrentUserEntry ? 1 : 0.8, // Highlight current user's entries
+        opacity: selectedEvent?.id === event.id ? 1 : (isCurrentUserEntry ? 1 : 0.8), // Highlight current user's entries
         color: '#fff',
         border: '0px',
         display: 'block',
@@ -349,7 +349,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         cursor: 'pointer',
       },
     };
-  }, [effectiveCurrentUserId]);
+  }, [effectiveCurrentUserId, selectedEvent]);
 
   // Custom event component to show more details
   const EventComponent = useCallback(({ event }: { event: CalendarEvent }) => {
@@ -396,6 +396,9 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         )}
         <div style={{ fontSize: '0.8em', fontStyle: 'italic' }}>
           Por: {creator}
+        </div>
+        <div style={{ fontSize: '0.8em' }}>
+          Facturado: {entry.facturado ? 'Si' : 'No'}
         </div>
       </div>
     );
@@ -460,7 +463,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
             className="toolbar-btn today-btn"
             disabled={loadingEntries}
           >
-            Hoy
+            Semana actual
           </button>
           <button 
             type="button" 

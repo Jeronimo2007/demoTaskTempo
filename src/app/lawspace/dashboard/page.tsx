@@ -9,6 +9,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { addDays, subYears } from "date-fns";
+import ContractsTable from "@/components/contracts/ContractsTable";
 
 // Constantes para el manejo de tokens
 const TOKEN_KEY = "token";
@@ -44,6 +45,8 @@ export default function Dashboard() {
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummaryData[]>([]);
+    const [contracts, setContracts] = useState<any[]>([]);
+    const [clientNames, setClientNames] = useState<{ id: number; name: string }[]>([]);
   const [startDate, setStartDate] = useState(subYears(new Date(), 1));
   const [endDate, setEndDate] = useState(addDays(new Date(), 1));
   const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' });
@@ -236,8 +239,35 @@ export default function Dashboard() {
     fetchReportData,
     fetchTasks,
     fetchClientSummary,
-    verifyToken
+    verifyToken,
+    contracts
   ]);
+
+    useEffect(() => {
+      const fetchContracts = async () => {
+        try {
+          const token = getToken();
+          if (!token) {
+            console.error("No se encontró el token de autenticación.");
+            return;
+          }
+  
+          const contractsResponse = await axios.get(`${API_URL}/contracts/contracts`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setContracts(contractsResponse.data);
+  
+          const clientNamesResponse = await axios.get(`${API_URL}/clients/get_clients_name`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setClientNames(clientNamesResponse.data);
+        } catch (error) {
+          console.error("Error al obtener los contratos:", error);
+        }
+      };
+  
+      fetchContracts();
+    }, [getToken]);
 
   if (isLoading) return <p>Cargando...</p>;
 
@@ -302,6 +332,10 @@ export default function Dashboard() {
             )}
           </tbody>
         </table>
+      </div>
+      <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+        <h3 className="text-lg font-semibold mb-3">Contratos</h3>
+        <ContractsTable contracts={contracts} clientNames={clientNames} />
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-lg mt-6 text-black">
