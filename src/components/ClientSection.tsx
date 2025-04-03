@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPlus, faEdit, faSearch } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faPlus, faEdit, faSearch, faRotate } from "@fortawesome/free-solid-svg-icons";
 
 // Toggle Switch Component
 const ToggleSwitch = ({ 
@@ -456,13 +456,26 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     <div className="p-6 text-black shadow-lg rounded-lg bg-white">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Gestión de Clientes</h2>
-        <button 
-          onClick={openCreateClientModal}
-          className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-        >
-          <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          Nuevo Cliente
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => {
+              setIsLoading(true);
+              Promise.all([fetchClients(), fetchClientUserRelationships()]).finally(() => setIsLoading(false));
+            }}
+            className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+            title="Actualizar lista de clientes"
+          >
+            <FontAwesomeIcon icon={faRotate} className="mr-2" />
+            Actualizar
+          </button>
+          <button 
+            onClick={openCreateClientModal}
+            className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+          >
+            <FontAwesomeIcon icon={faPlus} className="mr-2" />
+            Nuevo Cliente
+          </button>
+        </div>
       </div>
       
       {/* Search Bar */}

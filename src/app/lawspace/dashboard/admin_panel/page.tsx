@@ -5,7 +5,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPlus, faEdit } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faPlus, faEdit, faRotate } from "@fortawesome/free-solid-svg-icons";
 import ClientSection from "@/components/ClientSection";
 import ReportDownload from "@/components/ReportDownload";
 
@@ -89,29 +89,42 @@ export default function AdminPanel() {
 
   // Get token from cookie
   const getToken = useCallback(() => {
-    return document.cookie
+    const token = document.cookie
       .split('; ')
       .find((row) => row.startsWith('token='))
       ?.split('=')[1] || "";
+    
+    console.log("%c=== TOKEN CHECK ===", "color: blue; font-weight: bold");
+    console.log("All cookies:", document.cookie);
+    console.log("Found token:", token ? "Yes" : "No");
+    console.log("Token value:", token);
+    console.log("%c==================", "color: blue; font-weight: bold");
+    
+    return token;
   }, []);
 
   // Function to fetch user data with token
   const fetchUserData = useCallback(async (token: string) => {
+    console.log("%c=== FETCH USER DATA ===", "color: green; font-weight: bold");
     try {
-      const response = await axios.get(`${API_URL}/auth/me`, {
+      const response = await axios.get(`${API_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.data) {
+        console.log("User data from API:", response.data);
+        console.log("Current user role:", response.data.role);
         // Update store with user data
         setUser(response.data, token);
+        console.log("User data updated in store");
         return true;
       }
       return false;
     } catch (error) {
-      console.error("Error al recuperar datos del usuario:", error);
+      console.error("Error fetching user data:", error);
       return false;
     } finally {
+      console.log("%c=====================", "color: green; font-weight: bold");
     }
   }, [setUser]);
 
@@ -142,6 +155,7 @@ export default function AdminPanel() {
 
   useEffect(() => {
     const initializePage = async () => {
+      console.log("%c=== PAGE INITIALIZATION ===", "color: purple; font-weight: bold");
       setIsLoading(true);
 
       const token = getToken();
@@ -153,40 +167,77 @@ export default function AdminPanel() {
         return;
       }
 
-      // Attempt to fetch user data to validate the token and populate the store
-      await fetchUserData(token);
+      try {
+        // First check if user is authenticated and has correct role
+        console.log("Fetching user data from API...");
+        const userResponse = await axios.get(`${API_URL}/users/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      // After attempting fetch, check the user state directly from the store
-      const currentUser = useAuthStore.getState().user;
-
-      if (currentUser) {
-        // User data exists in the store, now check role
+        const userData = userResponse.data;
+        console.log("User data received:", userData);
+        console.log("User role:", userData?.role);
+        
+        // Check if user exists and has correct role
         const authorizedRoles = ["socio", "senior", "consultor"];
-        if (authorizedRoles.includes(currentUser.role || "")) {
-          // User is authenticated and authorized
-          console.log("User authenticated and authorized. Fetching data...");
-          try {
-            await Promise.all([fetchClients(), fetchTasks()]);
-            console.log("Clients and tasks fetched.");
-          } catch (error) {
-            console.error('Error fetching page data:', error);
-          }
-        } else {
-          // User is authenticated but not authorized for this page
-          console.log(`User role "${currentUser.role}" not authorized, redirecting.`);
+        console.log("Checking authorization...");
+        console.log("Authorized roles:", authorizedRoles);
+        console.log("User role:", userData?.role);
+        console.log("Is authorized:", authorizedRoles.includes(userData?.role));
+        
+        if (!userData || !authorizedRoles.includes(userData.role)) {
+          console.log(`User role "${userData?.role}" not authorized, redirecting.`);
           router.push("/"); // Redirect to home or an 'unauthorized' page
+          setIsLoading(false);
+          return;
         }
-      } else {
-        // No user data in store after fetch attempt, token likely invalid/expired
-        console.log("User data not found after fetch attempt, redirecting to login.");
-        router.push('/login');
-      }
 
-      setIsLoading(false);
+        // Update store with user data
+        console.log("Updating user in store...");
+        setUser(userData, token);
+        
+        // Log current store state
+        const currentStoreUser = useAuthStore.getState().user;
+        console.log("Current store user:", currentStoreUser);
+
+        // Only fetch data if user is authorized
+        console.log("Fetching clients and tasks...");
+        await Promise.all([fetchClients(), fetchTasks()]);
+        console.log("Clients and tasks fetched successfully.");
+      } catch (error) {
+        console.error('Error during initialization:', error);
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          console.log("Token is invalid or expired, redirecting to login");
+          router.push('/login');
+        } else {
+          setUpdateError("Error al cargar los datos. Por favor, intente nuevamente.");
+        }
+      } finally {
+        setIsLoading(false);
+        console.log("%c=========================", "color: purple; font-weight: bold");
+      }
     };
 
     initializePage();
-  }, [router, getToken, fetchUserData, fetchClients, fetchTasks, setUser]); // Keep dependencies
+  }, [router, getToken, fetchClients, fetchTasks, setUser]);
+
+  // Add a check for unauthorized access when component mounts
+  useEffect(() => {
+    console.log("%c=== COMPONENT MOUNT CHECK ===", "color: orange; font-weight: bold");
+    const currentUser = useAuthStore.getState().user;
+    console.log("Current user from store:", currentUser);
+    
+    const authorizedRoles = ["socio", "senior", "consultor"];
+    console.log("Checking authorization on mount...");
+    console.log("User role:", currentUser?.role);
+    console.log("Is authorized:", currentUser ? authorizedRoles.includes(currentUser.role) : false);
+    
+    if (currentUser && !authorizedRoles.includes(currentUser.role)) {
+      console.log(`Unauthorized access attempt by user with role "${currentUser.role}"`);
+      router.push("/");
+    }
+    console.log("%c=========================", "color: orange; font-weight: bold");
+  }, [router]);
 
   const openTaskModal = () => {
     setNewTask({
@@ -480,6 +531,17 @@ export default function AdminPanel() {
                 <option key={client.id} value={client.id}>{client.name}</option>
               ))}
             </select>
+            <button
+              onClick={() => {
+                setIsLoading(true);
+                fetchTasks().finally(() => setIsLoading(false));
+              }}
+              className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+              title="Actualizar lista de tareas"
+            >
+              <FontAwesomeIcon icon={faRotate} className="mr-2" />
+              Actualizar
+            </button>
             <button
               onClick={openTaskModal}
               className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"

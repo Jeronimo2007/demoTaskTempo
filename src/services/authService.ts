@@ -43,6 +43,10 @@ export const registerUser = async (username: string, password: string, role_code
 };
 
 export const loginUser = async (username: string, password: string) => {
+    // Clear existing data first
+    localStorage.removeItem(TOKEN_KEY);
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
     const params = new URLSearchParams();
     params.append('username', username);
     params.append('password', password);
@@ -56,6 +60,8 @@ export const loginUser = async (username: string, password: string) => {
     // Guardar el token automáticamente al iniciar sesión
     if (response.data && response.data.access_token) {
       saveToken(response.data.access_token);
+      // Set cookie with new token
+      document.cookie = `token=${response.data.access_token}; path=/`;
     }
   
     return response.data;
@@ -79,5 +85,9 @@ export const getUserData = async (token?: string) => {
  * Cierra la sesión del usuario eliminando el token
  */
 export const logout = (): void => {
+  // Clear localStorage
   removeToken();
+  
+  // Clear cookie
+  document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 };

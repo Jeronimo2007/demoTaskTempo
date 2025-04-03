@@ -17,15 +17,30 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
   setUser: (user, token) => {
-    // Store user and token in localStorage
+    // Clear existing data first
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // Store new user and token in localStorage
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
+    
+    // Set cookie with new token
+    document.cookie = `token=${token}; path=/`;
+    
+    // Update store state
     set({ user, token });
   },
   logout: () => {
-    // Clear localStorage on logout
+    // Clear localStorage
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    
+    // Clear cookie
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // Clear store state
     set({ user: null, token: null });
   },
 }));
