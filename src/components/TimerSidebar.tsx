@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPlay, FaPause, FaStop, FaSave, FaSync, FaTimes, FaClock, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaSync, FaTimes, FaClock, FaPlus, FaTrash } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
 import { Task } from '@/types/task';
 
@@ -46,7 +46,6 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
   // References
   const timerRef = useRef<HTMLDivElement>(null);
   const timerIntervalsRef = useRef<Map<string, number>>(new Map());
-  const previousTasksRef = useRef<Task[]>(tasks);
   
   // Function to notify layout about timer state changes
   const notifyTimerStateChange = useCallback((isActive: boolean) => {
@@ -85,7 +84,7 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
       // Ensure we notify that no timer is active when component unmounts
       notifyTimerStateChange(false);
     };
-  }, [notifyTimerStateChange, errorTimeout]);
+  }, [notifyTimerStateChange, errorTimeout, timerIntervalsRef]);
   
   // Use localStorage to save timers state between page refreshes
   useEffect(() => {
@@ -463,12 +462,6 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
     return 'Sin cliente';
   };
 
-  // Get task by id
-  const getTaskById = (taskId: number | null): Task | undefined => {
-    if (taskId === null) return undefined;
-    return tasks.find(task => task.id === taskId);
-  };
-
   // Get active timers for display in the toggle button
   const getActiveTimers = () => {
     return timers.filter(timer => timer.isRunning || timer.isPaused);
@@ -503,237 +496,151 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
         </div>
       )}
 
-      {/* Sidebar */}
-      <div 
+      <div
         ref={timerRef}
-        className={`fixed right-0 top-0 h-full bg-white shadow-xl transition-transform duration-300 ease-in-out z-40 ${isOpen ? 'translate-x-0' : 'translate-x-full'} ${className || ''}`}
-        style={{ 
-          width: '350px',
-          maxWidth: '95vw'
-        }}
+        className={`fixed top-0 right-0 h-full w-80 bg-gray-100 shadow-lg transform transition-transform duration-300 z-50 ${className} ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
-        {/* Header */}
-        <div 
-          className="p-4 flex justify-between items-center border-b"
-          style={{ backgroundColor: '#3B82F6' }}
-        >
-          <span className="font-medium text-white text-lg">
-            Temporizadores
-          </span>
-          <div className="flex items-center">
-            <button 
-              onClick={addNewTimer}
-              className="mr-3 text-white hover:text-green-200 focus:outline-none"
-              aria-label="Add new timer"
-              title="Añadir nuevo timer"
-            >
-              <FaPlus />
-            </button>
-            <button 
-              onClick={toggleSidebar} 
-              className="text-white hover:text-gray-200 focus:outline-none"
-              aria-label="Close timer sidebar"
-            >
-              <FaTimes />
+        {/* Sidebar content */}
+        <div className="p-4 flex flex-col h-full">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-black">Temporizadores</h2>
+            <button onClick={toggleSidebar} className="p-2 bg-gray-200 rounded hover:bg-gray-300" aria-label="Close timer sidebar">
+              <FaTimes className="text-black" />
             </button>
           </div>
-        </div>
-        
-        {/* Content */}
-        <div className="overflow-y-auto h-full" style={{ maxHeight: 'calc(100vh - 64px)' }}>
-          {/* Global messages */}
+
+          {/* Error message */}
           {errorMessage && (
-            <div className="text-center text-sm text-red-500 m-3 p-2 bg-red-50 rounded">
+            <div className="mb-4 p-3 bg-red-200 text-red-700 rounded">
               {errorMessage}
             </div>
           )}
-          
-          {isSaving && (
-            <div className="text-center text-sm text-blue-500 m-3 flex items-center justify-center p-2 bg-blue-50 rounded">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-              Guardando en el servidor...
-            </div>
-          )}
-          
-          {/* Timer tabs or list */}
-          {timers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8">
-              <p className="text-gray-500 mb-4 text-center">No hay temporizadores activos</p>
-              <button 
-                onClick={addNewTimer}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition flex items-center justify-center"
-              >
-                <FaPlus className="mr-2" /> Añadir Temporizador
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col divide-y">
-              {/* Timer tabs */}
-              <div className="flex overflow-x-auto p-2 bg-gray-100">
-                {timers.map((timer) => {
-                  const task = getTaskById(timer.taskId);
-                  const isActive = timer.id === activeTimerId;
-                  const isTimerRunning = timer.isRunning;
-                  const isTimerPaused = timer.isPaused;
-                  
-                  return (
-                    <button
-                      key={timer.id}
-                      onClick={() => setActiveTimerId(timer.id)}
-                      className={`flex-shrink-0 px-3 py-2 rounded-t text-sm font-medium mr-1 ${
-                        isActive 
-                          ? 'bg-white border-t border-l border-r border-gray-300' 
-                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                      } ${isTimerRunning ? 'text-green-600' : isTimerPaused ? 'text-yellow-600' : ''}`}
-                    >
-                      <span className="truncate max-w-[100px] inline-block">
-                        {task ? task.title : 'Sin tarea'}
-                      </span>
-                      {(isTimerRunning || isTimerPaused) && (
-                        <span className="ml-2 text-xs">
-                          {formatTime(timer.displayTime)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              
-              {/* Active timer content */}
-              {activeTimerId && (
-                <div className="p-4">
-                  {timers.map((timer) => {
-                    if (timer.id !== activeTimerId) return null;
-                    
-                    const task = getTaskById(timer.taskId);
-                    
-                    return (
-                      <div key={timer.id} className="flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-medium">
-                            {task ? task.title : 'Seleccione una tarea'}
-                          </h3>
-                          <button 
-                            onClick={() => removeTimer(timer.id)}
-                            className="text-red-500 hover:text-red-700"
-                            disabled={timer.isRunning || timer.isPaused}
-                            title="Eliminar temporizador"
-                          >
-                            <FaTrash />
-                          </button>
-                        </div>
-                        
-                        <select
-                          value={timer.taskId ?? ''}
-                          onChange={(e) => {
-                            const newTaskId = e.target.value ? Number(e.target.value) : null;
-                            updateTimerTask(timer.id, newTaskId);
-                          }}
-                          className="w-full border p-2 rounded mb-4 text-black"
-                          disabled={timer.isRunning || timer.isPaused}
-                        >
-                          <option value="">Seleccionar tarea</option>
-                          {tasks.map((task) => (
-                            <option key={task.id} value={task.id} className="text-black">
-                              {task.title} - {getClientName(task)}
-                            </option>
-                          ))}
-                        </select>
-                        
-                        <textarea
-                          value={timer.description}
-                          onChange={(e) => updateTimerDescription(timer.id, e.target.value)}
-                          placeholder="Descripción de la actividad"
-                          className="w-full border p-2 rounded mb-4 text-black resize-none"
-                          rows={3}
-                          disabled={isSaving}
-                        />
-                        
-                        <div className="text-center text-3xl font-bold mb-2 text-black">
-                          {formatTime(timer.displayTime)}
-                        </div>
-                        
-                        {timer.startTime && (
-                          <div className="text-center text-sm text-gray-500 mb-2">
-                            Iniciado a las {formatStartTime(timer.startTime)}
-                          </div>
-                        )}
-                        
-                        <div className="flex flex-col gap-3 mt-4">
-                          {!timer.isRunning && !timer.isPaused && (
-                            <button 
-                              onClick={() => startTimer(timer.id)} 
-                              className="bg-green-500 text-white px-4 py-3 rounded hover:bg-green-600 transition flex items-center justify-center"
-                              disabled={timer.taskId === null || isSaving}
-                            >
-                              <FaPlay className="mr-2" /> Iniciar Timer
-                            </button>
-                          )}
-                          
-                          {timer.isPaused && (
-                            <>
-                              <div className="flex w-full gap-2">
-                                <button 
-                                  onClick={() => resumeTimer(timer.id)} 
-                                  className="bg-green-500 text-white px-4 py-3 rounded flex-1 hover:bg-green-600 transition flex items-center justify-center"
-                                  disabled={isSaving}
-                                >
-                                  <FaPlay className="mr-2" /> Reanudar
-                                </button>
-                                <button 
-                                  onClick={() => stopTimer(timer.id, true)} 
-                                  className="bg-blue-500 text-white px-4 py-3 rounded flex-1 hover:bg-blue-600 transition flex items-center justify-center"
-                                  disabled={isSaving}
-                                >
-                                  <FaSave className="mr-2" /> Guardar
-                                </button>
-                              </div>
-                              <button 
-                                onClick={() => resetTimer(timer.id)} 
-                                className="bg-red-500 text-white px-4 py-2 rounded w-1/2 mx-auto hover:bg-red-600 transition flex items-center justify-center mt-2"
-                                disabled={isSaving}
-                              >
-                                <VscDebugRestart className="mr-2" /> Reiniciar
-                              </button>
-                            </>
-                          )}
-                          
-                          {timer.isRunning && (
-                            <div className="flex w-full gap-3 flex-col">
-                              <button 
-                                onClick={() => pauseTimer(timer.id)} 
-                                className="bg-yellow-500 text-white px-4 py-3 rounded hover:bg-yellow-600 transition flex items-center justify-center"
-                                disabled={isSaving}
-                              >
-                                <FaPause className="mr-2" /> Pausar
-                              </button>
-                              <button 
-                                onClick={() => stopTimer(timer.id, true)} 
-                                className="bg-red-500 text-white px-4 py-3 rounded hover:bg-red-600 transition flex items-center justify-center"
-                                disabled={isSaving}
-                              >
-                                <FaStop className="mr-2" /> Detener
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+
+          <div className="flex-grow overflow-y-auto">
+            {timers.map((timer, index) => (
+              <div key={timer.id} className="mb-6 p-4 bg-white rounded shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-medium text-black">Temporizador {index + 1}</h3>
+                  <button
+                    onClick={() => removeTimer(timer.id)}
+                    className="p-2 bg-red-200 text-red-700 rounded hover:bg-red-300"
+                    aria-label="Remove timer"
+                  >
+                    <FaTrash className="text-lg" />
+                  </button>
                 </div>
-              )}
-              
-              {/* Refresh button at the bottom */}
-              <div className="p-4 mt-auto">
-                <button 
-                  onClick={handleManualRefresh} 
-                  className="bg-gray-500 text-white px-4 py-2 rounded w-full hover:bg-gray-600 transition flex items-center justify-center"
-                >
-                  <FaSync className="mr-2" /> Refrescar
-                </button>
+
+                <div className="mb-2">
+                  <label htmlFor={`task-select-${timer.id}`} className="block text-sm font-medium text-black">
+                    Tarea:
+                  </label>
+                  <select
+                    id={`task-select-${timer.id}`}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-black"
+                    value={timer.taskId === null ? '' : timer.taskId}
+                    onChange={(e) => updateTimerTask(timer.id, Number(e.target.value))}
+                  >
+                    <option value="">Selecciona una tarea</option>
+                    {tasks.map((task) => (
+                      <option key={task.id} value={task.id}>
+                        {getClientName(task)} - {task.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mb-2">
+                  <label htmlFor={`description-${timer.id}`} className="block text-sm font-medium text-black">
+                    Descripción:
+                  </label>
+                  <input
+                    type="text"
+                    id={`description-${timer.id}`}
+                    className="mt-1 block w-full pl-3 pr-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-black"
+                    placeholder="Descripción de la actividad"
+                    value={timer.description}
+                    onChange={(e) => updateTimerDescription(timer.id, e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-2xl font-semibold text-black">
+                    {formatTime(timer.displayTime)}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {timer.startTime ? `Iniciado a las ${formatStartTime(timer.startTime)}` : 'Sin iniciar'}
+                  </div>
+                </div>
+
+                <div className="flex justify-around">
+                  {!timer.isRunning && !timer.isPaused && (
+                    <button
+                      onClick={() => startTimer(timer.id)}
+                      className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
+                      aria-label="Start timer"
+                    >
+                      <FaPlay className="text-lg" />
+                    </button>
+                  )}
+                  {timer.isRunning && (
+                    <button
+                      onClick={() => pauseTimer(timer.id)}
+                      className="p-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                      aria-label="Pause timer"
+                    >
+                      <FaPause className="text-lg" />
+                    </button>
+                  )}
+                  {timer.isPaused && (
+                    <button
+                      onClick={() => resumeTimer(timer.id)}
+                      className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      aria-label="Resume timer"
+                    >
+                      <FaPlay className="text-lg" />
+                    </button>
+                  )}
+                  {(timer.isRunning || timer.isPaused) && (
+                    <button
+                      onClick={() => stopTimer(timer.id)}
+                      className="p-2 bg-red-500 text-white rounded hover:bg-red-600"
+                      aria-label="Stop timer"
+                      disabled={isSaving}
+                    >
+                      {isSaving ? <FaSync className="animate-spin text-lg" /> : <FaStop className="text-lg" />}
+                    </button>
+                  )}
+                  {(timer.isRunning || timer.isPaused) && (
+                    <button
+                      onClick={() => resetTimer(timer.id)}
+                      className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                      aria-label="Reset timer"
+                    >
+                      <VscDebugRestart className="text-lg" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+
+          <button
+            onClick={addNewTimer}
+            className="w-full p-3 bg-blue-500 text-white rounded hover:bg-blue-600"
+            aria-label="Add new timer"
+          >
+            <FaPlus className="inline-block mr-2" /> Añadir Temporizador
+          </button>
+        </div>
+
+        <div className="p-4 border-t border-gray-300">
+          <button
+            onClick={handleManualRefresh}
+            className="w-full p-3 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+            aria-label="Refresh timers"
+          >
+            <FaSync className="inline-block mr-2" /> Refrescar
+          </button>
         </div>
       </div>
     </>

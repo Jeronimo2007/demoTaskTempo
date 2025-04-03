@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from "../../components/Sidebar";
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter, usePathname } from 'next/navigation';
-import { getUserData } from '@/services/authService';
 import TimerSidebar from '@/components/TimerSidebar';
 import taskService from '@/services/taskService';
 import timeEntryService from '@/services/timeEntryService';
@@ -30,13 +29,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Reference to track if timer is active to prevent unnecessary updates
   const timerActiveRef = useRef<boolean>(false);
 
-  const getToken = useCallback(() => {
-    return document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("token="))
-      ?.split("=")[1] || "";
-  }, []);
-
   // Function to track timer state
   const setTimerActive = (isActive: boolean) => {
     timerActiveRef.current = isActive;
@@ -51,7 +43,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
       
       setIsLoading(true);
-      const token = getToken();
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("token="))
+        ?.split("=")[1] || "";
       
       if (!token || !user) {
         return;
@@ -111,7 +106,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } finally {
       setIsLoading(false);
     }
-  }, [user, getToken]);
+  }, [user]);
 
   // Handle time entry creation
   const handleTimeEntryCreate = async (entry: TimeEntry): Promise<void> => {
@@ -148,33 +143,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = getToken();
-      
-      if (!token) {
+      // Try to recover session from localStorage
+      if (!user) {
+        const storedUser = localStorage.getItem('user');
+        const storedToken = localStorage.getItem('token');
+        
+        if (storedUser && storedToken) {
+          try {
+            setUser(JSON.parse(storedUser), storedToken);
+            return;
+          } catch (error) {
+            console.error('Error recovering session:', error);
+          }
+        }
         router.push('/login');
         return;
       }
 
-      if (!user) {
-        try {
-          const userData = await getUserData(token);
-          if (userData && userData.id && userData.role) {
-            setUser(userData, token);
-          } else {
-            router.push('/login');
-          }
-        } catch (error) {
-          console.error('Error getting user data:', error);
-          router.push('/login');
-        }
-      } else {
-        // Fetch tasks for the timer when user is available
-        fetchTasks(true);
-      }
+      // Fetch tasks for the timer when user is available
+      fetchTasks(true);
     };
 
     checkAuth();
-  }, [user, setUser, router, getToken, fetchTasks]);
+  }, [user, router, setUser, fetchTasks]);
 
   // Refresh tasks periodically or when user changes
   useEffect(() => {

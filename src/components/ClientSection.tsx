@@ -1,8 +1,7 @@
-
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPlus, faEdit } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faPlus, faEdit, faSearch } from "@fortawesome/free-solid-svg-icons";
 
 // Toggle Switch Component
 const ToggleSwitch = ({ 
@@ -119,6 +118,13 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     clientName: ""
   });
   
+  // Add search state
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Add pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
   const getToken = useCallback(() => {
     return document.cookie
       .split("; ")
@@ -422,6 +428,30 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     setClientForm(prev => ({ ...prev, permanent: !prev.permanent }));
   };
 
+  // Add search functionality
+  const filteredClients = clients.filter(client => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      client.name.toLowerCase().includes(searchLower) ||
+      (client.nit && client.nit.toLowerCase().includes(searchLower)) ||
+      (client.phone && client.phone.toLowerCase().includes(searchLower)) ||
+      (client.email && client.email.toLowerCase().includes(searchLower)) ||
+      (client.city && client.city.toLowerCase().includes(searchLower))
+    );
+  });
+
+  // Update pagination calculations to use filtered clients
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const paginatedClients = filteredClients.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   return (
     <div className="p-6 text-black shadow-lg rounded-lg bg-white">
       <div className="flex justify-between items-center mb-4">
@@ -433,6 +463,22 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
           <FontAwesomeIcon icon={faPlus} className="mr-2" />
           Nuevo Cliente
         </button>
+      </div>
+      
+      {/* Search Bar */}
+      <div className="mb-4">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Buscar cliente por nombre, NIT, teléfono, email o ciudad..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="absolute left-3 top-2.5 text-gray-400">
+            <FontAwesomeIcon icon={faSearch} />
+          </div>
+        </div>
       </div>
       
       {error && (
@@ -461,7 +507,7 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                 </tr>
               </thead>
               <tbody>
-                {clients.map((client) => (
+                {paginatedClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50">
                     <td className="border-b border-black p-2">{client.name}</td>
                     <td className="border-b border-black p-2">{client.nit || "-"}</td>
@@ -528,6 +574,27 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex justify-between items-center mt-4">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-gray-700">
+              Página {currentPage} de {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+            >
+              Siguiente
+            </button>
           </div>
 
           {/* Client Form Modal */}

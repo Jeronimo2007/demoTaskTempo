@@ -29,6 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
   'Vencido': '#F44336',
   'Cancelado': '#9E9E9E',
   'Gestionar al cliente': '#9C27B0',
+  'Gestionar al tercero': '#FF69B4',
   'default': '#666666'
 };
 

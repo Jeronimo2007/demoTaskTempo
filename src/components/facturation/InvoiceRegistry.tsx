@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface Invoice {
@@ -40,12 +39,12 @@ interface InvoiceRegistryProps {
 }
 
 const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNotification }) => {
-  // Estado para las fechas de inicio y fin
+  // Estado para las fechas de inicio y fin (3 meses atrás hasta mañana)
   const [startDate, setStartDate] = useState<string>(
-    format(subMonths(new Date(), 1), 'yyyy-MM-dd')
+    format(subMonths(new Date(), 3), 'yyyy-MM-dd')
   );
   const [endDate, setEndDate] = useState<string>(
-    format(new Date(), 'yyyy-MM-dd')
+    format(addDays(new Date(), 1), 'yyyy-MM-dd')
   );
   
   // Estado para las facturas y carga
@@ -53,6 +52,10 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Estado para paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Estado para los clientes
   const [clients, setClients] = useState<Client[]>([]);
@@ -137,45 +140,43 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
         }
       });
 
-      // Procesar las facturas para asignar client_id a partir del client_name si es necesario
-      const processedInvoices = response.data.map((invoice: any) => {
-        // Si no hay client_id, pero hay client_name, intentamos buscar el cliente por nombre
-        if ((invoice.client_id === undefined || invoice.client_id === null) && invoice.client_name) {
-          // Buscar el cliente por nombre
-          const matchingClient = clients.find(client => 
-            client.name.toLowerCase() === invoice.client_name.toLowerCase()
-          );
-          
-          if (matchingClient) {
-            return {
-              ...invoice,
-              client_id: matchingClient.id
-            };
-          } else {
-            return invoice; // Mantener null si no se encuentra coincidencia
+      // Procesar y ordenar las facturas por fecha
+      const processedInvoices = response.data
+        .map((invoice: Invoice) => {
+          if ((invoice.client_id === undefined || invoice.client_id === null) && invoice.client_name) {
+            const matchingClient = clients.find(client => 
+              client.name.toLowerCase() === invoice.client_name.toLowerCase()
+            );
+            
+            if (matchingClient) {
+              return {
+                ...invoice,
+                client_id: matchingClient.id
+              };
+            }
           }
-        }
-        return invoice;
-      });
+          return invoice;
+        })
+        .sort((a: Invoice, b: Invoice) => 
+          new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime()
+        );
 
-      // Verificar si alguna factura tiene client_id null
-      const hasNullClientIds = processedInvoices.some((inv: any) => inv.client_id === null);
+      const hasNullClientIds = processedInvoices.some((inv: Invoice) => inv.client_id === null);
       setShowClientIdWarning(hasNullClientIds);
 
       setInvoices(processedInvoices);
       
-      // Si hay un cliente seleccionado, filtrar las facturas
+      // Filtrar por cliente si está seleccionado
       if (selectedClientId !== null) {
-        const filtered = processedInvoices.filter((invoice: any) => {
-          return invoice.client_id === selectedClientId;
-        });
+        const filtered = processedInvoices.filter((invoice: Invoice) => 
+          invoice.client_id === selectedClientId
+        );
         setFilteredInvoices(filtered);
       } else {
         setFilteredInvoices(processedInvoices);
       }
     } catch (err) {
       console.error('Error al obtener el registro de facturas:', err);
-      
       let message = 'Error al cargar el registro de facturas';
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 401) {
@@ -184,7 +185,6 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
           message = `Error ${err.response?.status || 'desconocido'}: ${err.message}`;
         }
       }
-      
       setErrorMessage(message);
       showNotification('Error', message, 'error');
     } finally {
@@ -244,6 +244,18 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
     setFilteredInvoices(filtered);
     setSelectedClientId(null);
   };
+
+  // Calcular paginación
+  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+  const paginatedInvoices = filteredInvoices.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Resetear a la primera página cuando cambia el filtro
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClientId, startDate, endDate]);
 
   return (
     <div className="bg-white rounded-lg border shadow-sm p-6 mt-8">
@@ -379,7 +391,7 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
                   Cargando ordenes...
                 </td>
               </tr>
-            ) : filteredInvoices.length === 0 ? (
+            ) : paginatedInvoices.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
                   No se encontraron ordenes en el período seleccionado
@@ -387,18 +399,14 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
                 </td>
               </tr>
             ) : (
-              filteredInvoices.map((invoice) => (
+              paginatedInvoices.map((invoice) => (
                 <tr key={invoice.id} className={invoice.client_id === null ? "bg-yellow-50" : ""}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(invoice.issued_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {invoice.client_name}
-                    {invoice.client_id === null ? (
-                      <span className="ml-1 text-xs text-red-500">(Sin ID)</span>
-                    ) : (
-                      <span className="ml-1 text-xs text-gray-400">(ID: {invoice.client_id})</span>
-                    )}
+                    
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {getBillingTypeText(invoice.billing_type)}
@@ -427,6 +435,29 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
           </tbody>
         </table>
       </div>
+
+      {/* Paginación */}
+      {!loading && paginatedInvoices.length > 0 && (
+        <div className="flex justify-between items-center mt-4">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-700">
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 };

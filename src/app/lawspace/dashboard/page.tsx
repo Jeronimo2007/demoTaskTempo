@@ -10,6 +10,8 @@ import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { addDays, subYears } from "date-fns";
 import ContractsTable from "@/components/contracts/ContractsTable";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
 
 // Constantes para el manejo de tokens
 const TOKEN_KEY = "token";
@@ -39,13 +41,26 @@ type ClientSummaryData = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+export interface Contract {
+  id: number;
+  client_id: number;
+  description: string | null;
+  total_value: number;
+  start_date: string;
+  end_date: string | null;
+  active: boolean;
+  total_pagado: number;
+  porcentaje_pagado: number;
+  created_at: string;
+}
+
 export default function Dashboard() {
   const { user } = useAuthStore();
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummaryData[]>([]);
-    const [contracts, setContracts] = useState<any[]>([]);
+    const [contracts, setContracts] = useState<Contract[]>([]);
     const [clientNames, setClientNames] = useState<{ id: number; name: string }[]>([]);
   const [startDate, setStartDate] = useState(subYears(new Date(), 1));
   const [endDate, setEndDate] = useState(addDays(new Date(), 1));
@@ -53,6 +68,17 @@ export default function Dashboard() {
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [uniqueClients, setUniqueClients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Add search states
+  const [permanentSearch, setPermanentSearch] = useState("");
+  const [contractsSearch, setContractsSearch] = useState("");
+  const [tasksSearch, setTasksSearch] = useState("");
+
+  // Add pagination states
+  const [currentPermanentPage, setCurrentPermanentPage] = useState(1);
+  const [currentContractsPage, setCurrentContractsPage] = useState(1);
+  const [currentTasksPage, setCurrentTasksPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Función mejorada para obtener el token, priorizando localStorage y luego cookies
   const getToken = useCallback(() => {
@@ -191,6 +217,8 @@ export default function Dashboard() {
         return "bg-gray-200"; // Gris
       case "gestionar al cliente":
         return "bg-purple-200"; // Morado
+      case "gestionar al tercero":
+        return "bg-pink-200"; // Rosa
       default:
         return "";
     }
@@ -209,6 +237,72 @@ export default function Dashboard() {
   const filteredTasks = selectedClient === "all"
     ? tasks
     : tasks.filter(task => task.client === selectedClient);
+
+  // Add search functionality
+  const filteredClientSummary = clientSummary.filter(client => {
+    const searchLower = permanentSearch.toLowerCase();
+    return (
+      client.client.toLowerCase().includes(searchLower) ||
+      client.current_month_hours.toString().includes(searchLower) ||
+      client.monthly_hours.toString().includes(searchLower) ||
+      formatCurrency(client.cost_current_month).toLowerCase().includes(searchLower)
+    );
+  });
+
+  const filteredContracts = contracts.filter(contract => {
+    const searchLower = contractsSearch.toLowerCase();
+    const clientName = clientNames.find(c => c.id === contract.client_id)?.name || "";
+    return (
+      clientName.toLowerCase().includes(searchLower) ||
+      contract.description?.toLowerCase().includes(searchLower) ||
+      formatCurrency(contract.total_value).toLowerCase().includes(searchLower) ||
+      contract.start_date.includes(searchLower) ||
+      (contract.end_date && contract.end_date.includes(searchLower))
+    );
+  });
+
+  const searchedTasks = filteredTasks.filter(task => {
+    const searchLower = tasksSearch.toLowerCase();
+    return (
+      task.title.toLowerCase().includes(searchLower) ||
+      task.status.toLowerCase().includes(searchLower) ||
+      task.client.toLowerCase().includes(searchLower) ||
+      task.area.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Calculate pagination for each table
+  const totalPermanentPages = Math.ceil(filteredClientSummary.length / itemsPerPage);
+  const totalContractsPages = Math.ceil(filteredContracts.length / itemsPerPage);
+  const totalTasksPages = Math.ceil(searchedTasks.length / itemsPerPage);
+
+  const paginatedClientSummary = filteredClientSummary.slice(
+    (currentPermanentPage - 1) * itemsPerPage,
+    currentPermanentPage * itemsPerPage
+  );
+
+  const paginatedContracts = filteredContracts.slice(
+    (currentContractsPage - 1) * itemsPerPage,
+    currentContractsPage * itemsPerPage
+  );
+
+  const paginatedTasks = searchedTasks.slice(
+    (currentTasksPage - 1) * itemsPerPage,
+    currentTasksPage * itemsPerPage
+  );
+
+  // Reset pagination when filters or search changes
+  useEffect(() => {
+    setCurrentTasksPage(1);
+  }, [selectedClient, tasksSearch]);
+
+  useEffect(() => {
+    setCurrentPermanentPage(1);
+  }, [permanentSearch]);
+
+  useEffect(() => {
+    setCurrentContractsPage(1);
+  }, [contractsSearch]);
 
   useEffect(() => {
     const initializePage = async () => {
@@ -313,7 +407,21 @@ export default function Dashboard() {
 
       {/* Asesoría Permanente Section */}
       <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
-        <h2 className="text-lg font-semibold mb-3">Asesoría Permanente - {currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)}</h2>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold">Asesoría Permanente - {currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)}</h2>
+          <div className="relative w-64">
+            <input
+              type="text"
+              placeholder="Buscar por cliente, horas o costo..."
+              value={permanentSearch}
+              onChange={(e) => setPermanentSearch(e.target.value)}
+              className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="absolute left-3 top-2.5 text-gray-400">
+              <FontAwesomeIcon icon={faSearch} />
+            </div>
+          </div>
+        </div>
         <table className="w-full border border-black rounded-lg overflow-hidden">
           <thead>
             <tr className="bg-[#4901ce] text-white">
@@ -323,41 +431,120 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {clientSummary.length > 0 ? (
-              clientSummary.map((client, index) => (
-                <tr key={index} className="hover:bg-gray-50"><td className="border border-black p-2">{client.client}</td><td className="border border-black p-2"><div className="flex items-center"><div className="w-full bg-gray-200 rounded-full h-4 mr-2"><div className="bg-blue-600 h-4 rounded-full" style={{ width: `${Math.min(100, (client.current_month_hours / client.monthly_hours) * 100)}%` }}></div></div><span className="whitespace-nowrap">{client.current_month_hours} / {client.monthly_hours} hrs</span></div></td><td className="border border-black p-2">{formatCurrency(client.cost_current_month)}</td></tr>
+            {paginatedClientSummary.length > 0 ? (
+              paginatedClientSummary.map((client, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="border border-black p-2">{client.client}</td>
+                  <td className="border border-black p-2">
+                    <div className="flex items-center">
+                      <div className="w-full bg-gray-200 rounded-full h-4 mr-2">
+                        <div className="bg-blue-600 h-4 rounded-full" style={{ width: `${Math.min(100, (client.current_month_hours / client.monthly_hours) * 100)}%` }}></div>
+                      </div>
+                      <span className="whitespace-nowrap">{client.current_month_hours} / {client.monthly_hours} hrs</span>
+                    </div>
+                  </td>
+                  <td className="border border-black p-2">{formatCurrency(client.cost_current_month)}</td>
+                </tr>
               ))
             ) : (
               <tr><td colSpan={4} className="border p-2 text-center text-gray-500">No hay datos de asesoría permanente.</td></tr>
             )}
           </tbody>
         </table>
+        {/* Pagination for Asesoría Permanente */}
+        <div className="flex justify-between items-center mt-4">
+          <button
+            onClick={() => setCurrentPermanentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPermanentPage === 1}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-700">
+            Página {currentPermanentPage} de {totalPermanentPages}
+          </span>
+          <button
+            onClick={() => setCurrentPermanentPage(prev => Math.min(prev + 1, totalPermanentPages))}
+            disabled={currentPermanentPage === totalPermanentPages}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
       <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
-        <h3 className="text-lg font-semibold mb-3">Contratos</h3>
-        <ContractsTable contracts={contracts} clientNames={clientNames} />
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-semibold">Contratos</h3>
+          <div className="relative w-64">
+            <input
+              type="text"
+              placeholder="Buscar por cliente, descripción o valor..."
+              value={contractsSearch}
+              onChange={(e) => setContractsSearch(e.target.value)}
+              className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="absolute left-3 top-2.5 text-gray-400">
+              <FontAwesomeIcon icon={faSearch} />
+            </div>
+          </div>
+        </div>
+        <ContractsTable contracts={paginatedContracts} clientNames={clientNames} />
+        {/* Pagination for Contracts */}
+        <div className="flex justify-between items-center mt-4">
+          <button
+            onClick={() => setCurrentContractsPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentContractsPage === 1}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-700">
+            Página {currentContractsPage} de {totalContractsPages}
+          </span>
+          <button
+            onClick={() => setCurrentContractsPage(prev => Math.min(prev + 1, totalContractsPages))}
+            disabled={currentContractsPage === totalContractsPages}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-lg mt-6 text-black">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-semibold">Tareas Actuales</h2>
-          <div className="flex items-center">
-            <label htmlFor="client-filter" className="mr-2 text-sm font-medium">
-              Filtrar por cliente:
-            </label>
-            <select
-              id="client-filter"
-              value={selectedClient}
-              onChange={(e) => setSelectedClient(e.target.value)}
-              className="p-2 border rounded text-sm"
-            >
-              <option value="all">Todos los clientes</option>
-              {uniqueClients.map((client) => (
-                <option key={client} value={client}>
-                  {client}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-4">
+            <div className="relative w-64">
+              <input
+                type="text"
+                placeholder="Buscar por título, estado o área..."
+                value={tasksSearch}
+                onChange={(e) => setTasksSearch(e.target.value)}
+                className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="absolute left-3 top-2.5 text-gray-400">
+                <FontAwesomeIcon icon={faSearch} />
+              </div>
+            </div>
+            <div className="flex items-center">
+              <label htmlFor="client-filter" className="mr-2 text-sm font-medium">
+                Filtrar por cliente:
+              </label>
+              <select
+                id="client-filter"
+                value={selectedClient}
+                onChange={(e) => setSelectedClient(e.target.value)}
+                className="p-2 border rounded text-sm"
+              >
+                <option value="all">Todos los clientes</option>
+                {uniqueClients.map((client) => (
+                  <option key={client} value={client}>
+                    {client}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         <table className="w-full border border-black rounded-lg overflow-hidden">
@@ -366,19 +553,19 @@ export default function Dashboard() {
               <th className="border border-black p-2 text-left">Título</th>
               <th className="border border-black p-2 text-left">Estado</th>
               <th className="border border-black p-2 text-left">Cliente</th>
-              <th className="border border-black p-2 text-left">Área</th> {/* New column header for area */}
+              <th className="border border-black p-2 text-left">Área</th>
             </tr>
           </thead>
           <tbody>
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => (
+            {paginatedTasks.length > 0 ? (
+              paginatedTasks.map((task) => (
                 <tr key={task.id} className="hover:bg-gray-50">
                   <td className="border border-black p-2">{task.title}</td>
                   <td className={`border border-black p-2 ${getStatusColor(task.status)}`}>
                     {task.status}
                   </td>
                   <td className="border border-black p-2">{task.client}</td>
-                  <td className="border border-black p-2">{task.area}</td> {/* New cell to display area */}
+                  <td className="border border-black p-2">{task.area}</td>
                 </tr>
               ))
             ) : (
@@ -392,6 +579,26 @@ export default function Dashboard() {
             )}
           </tbody>
         </table>
+        {/* Pagination for Tasks */}
+        <div className="flex justify-between items-center mt-4">
+          <button
+            onClick={() => setCurrentTasksPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentTasksPage === 1}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-700">
+            Página {currentTasksPage} de {totalTasksPages}
+          </span>
+          <button
+            onClick={() => setCurrentTasksPage(prev => Math.min(prev + 1, totalTasksPages))}
+            disabled={currentTasksPage === totalTasksPages}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
     </div>
   );

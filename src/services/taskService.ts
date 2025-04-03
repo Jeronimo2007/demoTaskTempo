@@ -8,13 +8,14 @@ export interface AssignedTask {
 }
 
 export interface Task {
-  client: string;
   id: number;
   title: string;
   status: string;
   due_date: string;
+  client?: string;
   client_id: number;
   client_name?: string;
+  name: string;
 }
 
 const getToken = (): string => {
@@ -58,7 +59,8 @@ export const taskService = {
       // Ensure client_id is always a number
       return response.data.map(task => ({
         ...task,
-        client_id: Number(task.client_id)
+        client_id: Number(task.client_id),
+        name: task.title // Use title as name if name is not provided
       }));
     } catch (error) {
       console.error('Error fetching all tasks:', error);

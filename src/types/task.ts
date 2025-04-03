@@ -7,6 +7,7 @@ export interface Task {
   client?: string;
   client_id?: number | null;
   client_name?: string;
+  name: string;
 }
 
 // Define an AssignedTask interface for task assignments

@@ -37,7 +37,6 @@ interface InvoiceByPercentageFormProps {
   API_URL: string;
   showNotification: (title: string, message: string, type: 'success' | 'error') => void;
   onSuccess?: () => void; // Optional callback for after successful form submission
-  openContractManager?: (clientId?: number) => void; // Function to open the contract manager
 }
 
 const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
@@ -47,7 +46,6 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
   API_URL,
   showNotification,
   onSuccess,
-  openContractManager
 }) => {
   const [loading, setLoading] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);

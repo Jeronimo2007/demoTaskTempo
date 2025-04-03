@@ -13,12 +13,13 @@ type ReportDownloadProps = {
 const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
   const user = useAuthStore((state) => state.user);
 
-  if (user?.role === 'consultor') {
-    return null;
-  }
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [selectedClientId, setSelectedClientId] = useState('');
+
+  if (user?.role === 'consultor') {
+    return null;
+  }
 
   const getToken = () => {
     return document.cookie

@@ -1,16 +1,23 @@
 'use client'
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation"; 
 import { loginUser } from "@/services/authService";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export default function LoginPage() {
-  const { setUser } = useAuthStore();
+  const { setUser, user } = useAuthStore();
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  // Check if user is already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/lawspace");
+    }
+  }, [user, router]);
 
   const handleLogin = async () => {
     try {

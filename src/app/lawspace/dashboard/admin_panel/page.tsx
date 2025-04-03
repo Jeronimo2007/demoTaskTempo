@@ -5,8 +5,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSave, faTrash, faTimes, faPlus, faFilter } from "@fortawesome/free-solid-svg-icons";
-import ClientSection from "@/components/ClientSection"; 
+import { faTrash, faPlus, faEdit } from "@fortawesome/free-solid-svg-icons";
+import ClientSection from "@/components/ClientSection";
 import ReportDownload from "@/components/ReportDownload";
 
 type ClientData = {
@@ -25,19 +25,19 @@ type TaskData = {
   area: string;
 };
 
-
 // Define task status options with their colors
 const TASK_STATUSES = [
   { value: "En proceso", color: "bg-yellow-500" },
   { value: "Finalizado", color: "bg-green-500" },
   { value: "Cancelado", color: "bg-gray-500" },
-  { value: "Gestionar al cliente", color: "bg-purple-500" }
+  { value: "Gestionar al cliente", color: "bg-purple-500" },
+  { value: "Gestionar al tercero", color: "bg-pink-500" }
 ];
 
 // Define area options
 const AREA_OPTIONS = [
   "Laboral",
-  "Comercial / Civil",
+  "Comercial/Civil",
   "Propiedad Intelectual",
   "Societario",
   "Administrativo"
@@ -46,18 +46,18 @@ const AREA_OPTIONS = [
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Utility function to normalize IDs for consistent comparison
-const stringifyId = (id: any): string => {
+const stringifyId = (id: string | number): string => {
   if (id === null || id === undefined) return '';
   return String(id).trim();
 };
 
 export default function AdminPanel() {
-  const { user, setUser } = useAuthStore();
+  const { setUser } = useAuthStore();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clients, setClients] = useState<ClientData[]>([]);
-  const [isLoadingUser, setIsLoadingUser] = useState(false);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -67,21 +67,19 @@ export default function AdminPanel() {
     area: "",
   });
 
+  // Pagination states
+  const [currentTaskPage, setCurrentTaskPage] = useState(1);
+  const itemsPerPage = 5;
+
+  // Filter states
+  const [clientFilter, setClientFilter] = useState<string>("");
+
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [editingTask, setEditingTask] = useState<Partial<TaskData>>({});
-  const [clientsUpdated, setClientsUpdated] = useState(0); // Counter to trigger refreshes
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState({
     isOpen: false
   });
-  // Client filter state
-  const [clientFilter, setClientFilter] = useState<string>("");
-
-  // Helper function to check if a client is permanent
-  const isClientPermanent = useCallback((clientId: number) => {
-    const client = clients.find(c => c.id === clientId);
-    return client?.permanent || false;
-  }, [clients]);
 
   // Helper function to get status color
   const getStatusColor = (status: string) => {
@@ -100,11 +98,10 @@ export default function AdminPanel() {
   // Function to fetch user data with token
   const fetchUserData = useCallback(async (token: string) => {
     try {
-      setIsLoadingUser(true);
       const response = await axios.get(`${API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (response.data) {
         // Update store with user data
         setUser(response.data, token);
@@ -115,9 +112,8 @@ export default function AdminPanel() {
       console.error("Error al recuperar datos del usuario:", error);
       return false;
     } finally {
-      setIsLoadingUser(false);
     }
-  }, [API_URL, setUser]);
+  }, [setUser]);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -144,118 +140,53 @@ export default function AdminPanel() {
     }
   }, [getToken]);
 
-  // Debug function to inspect data structures
-  const debugDataStructure = useCallback(() => {
-    console.log("%c=== DATOS DE DEPURACIÓN ===", "color: blue; font-weight: bold");
-    
-    // Examine task structure
-    if (tasks.length > 0) {
-      console.log("%cEjemplo de tarea:", "font-weight: bold");
-      console.log(tasks[0]);
-      console.log("%cTipos de datos en client_id:", "font-weight: bold");
-      
-      // Create a map of client_id types found
-      const idTypes = tasks.reduce((acc, task) => {
-        const type = typeof task.client_id;
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      console.log(idTypes);
-      
-      // Show client_id values
-      console.log("%cValores de client_id en tareas:", "font-weight: bold");
-      tasks.forEach(task => {
-        console.log(`Tarea ${task.id}: client_id=${task.client_id} (${typeof task.client_id}), client=${task.client}`);
-      });
-    } else {
-      console.log("No hay tareas disponibles para depurar");
-    }
-    
-    // Examine client structure
-    if (clients.length > 0) {
-      console.log("%cEjemplo de cliente:", "font-weight: bold");
-      console.log(clients[0]);
-      console.log("%cTipos de datos en id de clientes:", "font-weight: bold");
-      
-      // Create a map of id types found
-      const idTypes = clients.reduce((acc, client) => {
-        const type = typeof client.id;
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      console.log(idTypes);
-      
-      // Show id values
-      console.log("%cValores de id en clientes:", "font-weight: bold");
-      clients.forEach(client => {
-        console.log(`Cliente: ${client.name}, id=${client.id} (${typeof client.id})`);
-      });
-    } else {
-      console.log("No hay clientes disponibles para depurar");
-    }
-    
-    console.log("%c=== FIN DATOS DE DEPURACIÓN ===", "color: blue; font-weight: bold");
-  }, [tasks, clients]);
-
-
-  // Effect to handle authentication and session recovery
   useEffect(() => {
-    const initializeSession = async () => {
+    const initializePage = async () => {
+      setIsLoading(true);
+
       const token = getToken();
-      
-      // If there's a token but no user, try to recover the session
-      if (token && !user && !isLoadingUser) {
-        console.log("Token detectado, recuperando sesión...");
-        const success = await fetchUserData(token);
-        
-        if (!success) {
-          console.log("No se pudo recuperar la sesión, redirigiendo al login");
-          router.push("/");
-          return;
-        }
-      } 
-      // If no token, redirect to login
-      else if (!token) {
-        console.log("No hay token, redirigiendo al login");
-        router.push("/");
+
+      if (!token) {
+        console.log("No token found, redirecting to login.");
+        router.push('/login');
+        setIsLoading(false);
         return;
       }
-      
-      // If we have a valid user, load data
-      if (user && ["socio", "senior", "consultor"].includes(user.role)) {
-        console.log("Usuario válido, cargando datos...");
-        
-        // Fetch clients and tasks only once when the session is initialized
-        if (clients.length === 0) {
-          fetchClients();
-        }
-        if (tasks.length === 0) {
-          fetchTasks();
-        }
-        
-        // Run debugging after data is loaded
-        const timer = setTimeout(() => {
-          debugDataStructure();
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-      } else if (user) {
-        // User with invalid role
-        console.log("Usuario con rol no válido");
-        router.push("/");
-      }
-    };
-    
-    initializeSession();
-    // Removed unnecessary dependencies to prevent infinite calls
-  }, [user, router, getToken, fetchUserData, clients.length, tasks.length, isLoadingUser]);
 
-  // Function to be passed to ClientSection to notify when clients are updated
-  const handleClientUpdate = useCallback(() => {
-    setClientsUpdated(prev => prev + 1); // Increment to trigger the effect
-  }, []);
+      // Attempt to fetch user data to validate the token and populate the store
+      await fetchUserData(token);
+
+      // After attempting fetch, check the user state directly from the store
+      const currentUser = useAuthStore.getState().user;
+
+      if (currentUser) {
+        // User data exists in the store, now check role
+        const authorizedRoles = ["socio", "senior", "consultor"];
+        if (authorizedRoles.includes(currentUser.role || "")) {
+          // User is authenticated and authorized
+          console.log("User authenticated and authorized. Fetching data...");
+          try {
+            await Promise.all([fetchClients(), fetchTasks()]);
+            console.log("Clients and tasks fetched.");
+          } catch (error) {
+            console.error('Error fetching page data:', error);
+          }
+        } else {
+          // User is authenticated but not authorized for this page
+          console.log(`User role "${currentUser.role}" not authorized, redirecting.`);
+          router.push("/"); // Redirect to home or an 'unauthorized' page
+        }
+      } else {
+        // No user data in store after fetch attempt, token likely invalid/expired
+        console.log("User data not found after fetch attempt, redirecting to login.");
+        router.push('/login');
+      }
+
+      setIsLoading(false);
+    };
+
+    initializePage();
+  }, [router, getToken, fetchUserData, fetchClients, fetchTasks, setUser]); // Keep dependencies
 
   const openTaskModal = () => {
     setNewTask({
@@ -300,9 +231,9 @@ export default function AdminPanel() {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       closeTaskModal();
-      
+
       fetchTasks();
       setUpdateError(null);
     } catch (error) {
@@ -313,19 +244,19 @@ export default function AdminPanel() {
 
   const handleUpdateTask = async () => {
     if (editingTaskId === null) return;
-  
+
     try {
       setUpdateError(null);
       const token = getToken();
       const taskToUpdate = tasks.find(task => task.id === editingTaskId);
       if (!taskToUpdate) return;
-  
+
       // Make sure we have all the required fields
       if (!editingTask.title) {
         setUpdateError("El título no puede estar vacío");
         return;
       }
-  
+
       const data = {
         id: editingTaskId, // Make sure to include the task ID
         title: editingTask.title,
@@ -333,20 +264,20 @@ export default function AdminPanel() {
         due_date: editingTask.due_date || taskToUpdate.due_date,
         area: editingTask.area || taskToUpdate.area,
       };
-  
-  
+
+
       await axios.put(
         `${API_URL}/tasks/update_task`, // Updated endpoint
         data,
-        { 
-          headers: { 
+        {
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
-          } 
+          }
         }
       );
-  
-      
+
+
       await fetchTasks(); // Refresh the task list
       setEditingTaskId(null);
       setEditingTask({});
@@ -365,12 +296,12 @@ export default function AdminPanel() {
   const handleDeleteTask = async (taskId: number) => {
     // Agregar confirmación antes de eliminar
     const isConfirmed = window.confirm("¿Está seguro que desea eliminar esta tarea?");
-    
+
     // Solo proceder si el usuario confirmó
     if (!isConfirmed) {
       return; // Salir de la función si el usuario cancela
     }
-    
+
     try {
       const token = getToken();
       await axios.delete(`${API_URL}/tasks/delete/${taskId}`, {
@@ -409,67 +340,67 @@ export default function AdminPanel() {
     if (!clientFilter) {
       return tasks;
     }
-    
+
     // Debug filter process
     console.log("%c=== DEPURACIÓN DE FILTRO ===", "color: green; font-weight: bold");
     console.log(`Filtrando por cliente: ${clientFilter}`);
-    
+
     // Strategy 1: Strict comparison after string normalization
     const strictFiltered = tasks.filter(task => {
       // Normalize both values to string for comparison
       const taskClientIdStr = stringifyId(task.client_id);
       const filterClientIdStr = stringifyId(clientFilter);
-      
+
       return taskClientIdStr === filterClientIdStr;
     });
-    
+
     console.log(`Resultados con comparación estricta: ${strictFiltered.length}`);
-    
+
     // If strict comparison returns no results, try more flexible approaches
     if (strictFiltered.length === 0) {
       console.log("Intentando comparación flexible...");
-      
+
       // Strategy 2: Comparison after converting both to numbers
       const flexFiltered = tasks.filter(task => {
         // Convert to number if possible
         const taskClientId = Number(task.client_id);
         const filterClientId = Number(clientFilter);
-        
+
         // Check if they are valid numbers before comparing
         if (!isNaN(taskClientId) && !isNaN(filterClientId)) {
           return taskClientId === filterClientId;
         }
         return false;
       });
-      
+
       console.log(`Resultados con comparación numérica: ${flexFiltered.length}`);
-      
+
       // Strategy 3: Search by client name
       if (flexFiltered.length === 0) {
         console.log("Intentando búsqueda por nombre de cliente...");
-        
+
         // Find the selected client to get its name
         const selectedClient = clients.find(c => stringifyId(c.id) === stringifyId(clientFilter));
-        
+
         if (selectedClient) {
           const nameFiltered = tasks.filter(task => {
             // Check if the task's client name includes the selected client's name
             return task.client && task.client.includes(selectedClient.name);
           });
-          
+
           console.log(`Resultados con búsqueda por nombre: ${nameFiltered.length}`);
-          
+
           if (nameFiltered.length > 0) {
             console.log("Usando resultados de búsqueda por nombre");
             return nameFiltered;
           }
         }
       }
-      
+
       console.log("Usando resultados de comparación numérica");
       return flexFiltered;
     }
-    
+
     console.log("Usando resultados de comparación estricta");
     console.log("%c=== FIN DEPURACIÓN DE FILTRO ===", "color: green; font-weight: bold");
     return strictFiltered;
@@ -485,255 +416,252 @@ export default function AdminPanel() {
     const value = e.target.value;
     console.log("%c=== CAMBIO DE FILTRO ===", "color: purple; font-weight: bold");
     console.log(`Valor seleccionado: "${value}" (${typeof value})`);
-    
+
     if (value) {
       // Find the selected client for debugging
       const selectedClient = clients.find(c => stringifyId(c.id) === stringifyId(value));
       console.log("Cliente seleccionado:", selectedClient);
-      
+
       // Check for possible matches
       const possibleMatches = tasks.filter(task => {
-        return stringifyId(task.client_id) === stringifyId(value) || 
-               Number(task.client_id) === Number(value);
+        return stringifyId(task.client_id) === stringifyId(value) ||
+          Number(task.client_id) === Number(value);
       });
-      
+
       console.log(`Posibles coincidencias encontradas: ${possibleMatches.length}`);
       possibleMatches.forEach(task => {
-        console.log(`- Tarea: ${task.title}, client_id: ${task.client_id} (${typeof task.client_id})`);
+        console.log(`Tarea ${task.id}: client_id=${task.client_id}, client=${task.client}`);
       });
     }
-    
-    console.log("%c=== FIN CAMBIO DE FILTRO ===", "color: purple; font-weight: bold");
+
     setClientFilter(value);
-    
-    // Run data structure debugging when filter changes
-    setTimeout(debugDataStructure, 500);
   };
 
-  // Reset client filter
-  const clearClientFilter = () => {
-    setClientFilter("");
+  // Pagination calculations
+  const totalTaskPages = Math.ceil(filteredTasks.length / itemsPerPage);
+
+  const paginatedTasks = filteredTasks
+    .slice((currentTaskPage - 1) * itemsPerPage, currentTaskPage * itemsPerPage);
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0]; // This will give YYYY-MM-DD format
   };
 
-  // Show loading indicator while recovering user
-  if (isLoadingUser) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Recuperando sesión...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
-  if (!user) return <p>Cargando...</p>;
 
   return (
-    <div className="p-6 text-black">
-      <h1 className="text-2xl font-bold mb-4 text-black">Panel de Administración</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Panel de Administración</h1>
 
-      {/* Sección de Gestión de Clientes */}
-      <ClientSection onClientUpdate={handleClientUpdate} />
+      {/* Clients Section */}
+      <ClientSection />
 
-      {/* Sección combinada de Crear Tareas y Lista de Tareas */}
-      <div className="bg-white text-black p-6 rounded-lg shadow-lg mt-6">
+      {/* Tasks Section */}
+      <div className="p-6 text-black shadow-lg rounded-lg bg-white mt-10">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Gestión de Tareas</h2>
-          <button 
-            onClick={openTaskModal}
-            className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-          >
-            <FontAwesomeIcon icon={faPlus} className="mr-2" />
-            Nueva Tarea
-          </button>
+          <div className="flex gap-4">
+            <select
+              value={clientFilter}
+              onChange={handleClientFilterChange}
+              className="p-2 border rounded text-black"
+            >
+              <option value="">Todos los Clientes</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={openTaskModal}
+              className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+            >
+              <FontAwesomeIcon icon={faPlus} className="mr-2" />
+              Nueva Tarea
+            </button>
+          </div>
         </div>
-        
+
         {updateError && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {updateError}
+            <p>{updateError}</p>
           </div>
         )}
 
-        <h2 className="text-lg font-semibold mb-3">Lista de Tareas</h2>
-        
-        {/* Client Filter - Minimalist Version */}
-        <div className="mb-4 flex items-center space-x-3">
-          <div className="flex items-center">
-            <FontAwesomeIcon icon={faFilter} className="mr-2 text-gray-600" />
-            <span className="text-sm">Cliente:</span>
-          </div>
-          <select
-            value={clientFilter}
-            onChange={handleClientFilterChange}
-            className="border p-2 rounded"
-          >
-            <option value="">Todos los clientes</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-          {clientFilter && (
-            <button 
-              onClick={clearClientFilter}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Limpiar
-            </button>
-          )}
-          
-          {/* Debug info - can be removed in production */}
-          <span className="text-xs text-gray-500">
-            {clientFilter ? `Filtrando por cliente ID: ${clientFilter}` : 'Mostrando todas las tareas'}
-            {` (${filteredTasks.length} tareas)`}
-          </span>
-        </div>
-        
-        <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border-b border-black p-2 text-left">Título</th>
-              <th className="border-b border-black p-2 text-left">Estado</th>
-              <th className="border-b border-black p-2 text-left">Cliente</th>
-              <th className="border-b border-black p-2 text-left">Área</th>
-              <th className="border-b border-black p-2 text-left">Fecha de Vencimiento</th>
-              <th className="border-b border-black p-2 text-left">Asesoria Permanente</th>
-              <th className="border-b border-black p-2 text-left">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => {
-                const isPermanent = isClientPermanent(task.client_id);
-                
-                return (
+        <div className="overflow-x-auto">
+          <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border-b border-black p-2 text-left">Título</th>
+                <th className="border-b border-black p-2 text-left">Cliente</th>
+                <th className="border-b border-black p-2 text-left">Fecha de Entrega</th>
+                <th className="border-b border-black p-2 text-left">Área</th>
+                <th className="border-b border-black p-2 text-left">Estado</th>
+                <th className="p-2 text-left">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedTasks.map(task => (
                 <tr key={task.id} className="hover:bg-gray-50">
-                  <td className="border-b border-black p-2">
-                    {editingTaskId === task.id ? (
-                      <input
-                        type="text"
-                        value={editingTask.title || ""}
-                        onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                        className="border p-1 text-black rounded w-full"
-                      />
-                    ) : (
-                      task.title
-                    )}
-                  </td>
-                  <td className="border-b border-black p-2">
-                    {editingTaskId === task.id ? (
-                      <select
-                        value={editingTask.status || task.status}
-                        onChange={(e) => setEditingTask({ ...editingTask, status: e.target.value })}
-                        className="border p-1 text-black rounded w-full"
-                      >
-                        {TASK_STATUSES.map((status) => (
-                          <option key={status.value} value={status.value}>
-                            {status.value}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold inline-block text-center text-white ${getStatusColor(task.status)}`}>
-                        {task.status}
-                      </div>
-                    )}
-                  </td>
+                  <td className="border-b border-black p-2">{task.title}</td>
                   <td className="border-b border-black p-2">{task.client}</td>
+                  <td className="border-b border-black p-2">{formatDate(task.due_date)}</td>
+                  <td className="border-b border-black p-2">{task.area}</td>
                   <td className="border-b border-black p-2">
-                    {editingTaskId === task.id ? (
-                      <select
-                        value={editingTask.area || task.area || ""}
-                        onChange={(e) => setEditingTask({ ...editingTask, area: e.target.value })}
-                        className="border p-1 text-black rounded w-full"
-                      >
-                        <option value="">Seleccionar Área</option>
-                        {AREA_OPTIONS.map((area) => (
-                          <option key={area} value={area}>
-                            {area}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      task.area || "No especificada"
-                    )}
+                    <span className={`inline-flex items-center justify-center px-2 py-1 text-xs font-bold rounded ${getStatusColor(task.status)} text-white`}>
+                      {task.status}
+                    </span>
                   </td>
-                  <td className="border-b border-black p-2">
-                    {editingTaskId === task.id ? (
-                      <input
-                        type="date"
-                        value={editingTask.due_date || ""}
-                        onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
-                        className="border p-1 text-black rounded w-full"
-                      />
-                    ) : (
-                      task.due_date ? new Date(task.due_date).toLocaleDateString() : "Sin fecha"
-                    )}
-                  </td>
-                  <td className="border-b border-black p-2">
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold inline-block text-center ${
-                      isPermanent 
-                        ? "bg-green-500 text-white" 
-                        : "bg-gray-300 text-gray-700"
-                    }`}>
-                      {isPermanent ? "Sí" : "No"}
-                    </div>
-                  </td>
-                  <td className="border-b border-black p-2 flex space-x-2">
-                    {editingTaskId === task.id ? (
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={handleUpdateTask} 
-                          className="bg-blue-800 text-white p-2 rounded hover:bg-blue-700 transition"
-                          title="Guardar cambios"
-                        >
-                          <FontAwesomeIcon icon={faSave} />
-                        </button>
-                        <button 
-                          onClick={cancelEditing} 
-                          className="bg-gray-500 text-white p-2 rounded hover:bg-gray-400 transition"
-                          title="Cancelar edición"
-                        >
-                          <FontAwesomeIcon icon={faTimes} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={() => startEditingTask(task)} 
-                          className="bg-blue-600 text-white p-2 rounded hover:bg-blue-500 transition"
-                        >
-                          Editar
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteTask(task.id)} 
-                          className="bg-red-800 text-white p-2 rounded hover:bg-red-700 transition"
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </div>
-                    )}
+                  <td className="p-2 flex space-x-2">
+                    <button
+                      onClick={() => startEditingTask(task)}
+                      className="flex items-center text-blue-600 hover:text-blue-800 transition"
+                      title="Editar tarea"
+                    >
+                      <FontAwesomeIcon icon={faEdit} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="text-red-600 hover:text-red-800 transition"
+                      title="Eliminar tarea"
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
                   </td>
                 </tr>
-              );
-            })
-            ) : (
-              <tr>
-                <td colSpan={7} className="text-center py-4 text-gray-500">
-                  {clientFilter ? "No hay tareas para el cliente seleccionado" : "No hay tareas disponibles"}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex justify-between items-center mt-4">
+          <button
+            onClick={() => setCurrentTaskPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentTaskPage === 1}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-gray-700">
+            Página {currentTaskPage} de {totalTaskPages}
+          </span>
+          <button
+            onClick={() => setCurrentTaskPage(prev => Math.min(prev + 1, totalTaskPages))}
+            disabled={currentTaskPage === totalTaskPages}
+            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
 
-      {/* Task Creation Modal */}
+      {editingTaskId !== null && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Editar Tarea</h3>
+            
+            {updateError && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                <p>{updateError}</p>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="title" className="block text-sm font-medium mb-1">
+                    Título*:
+                  </label>
+                  <input
+                    id="title"
+                    type="text"
+                    className="border p-2 text-black rounded w-full"
+                    placeholder="Título"
+                    value={editingTask.title || ""}
+                    onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium mb-1">
+                    Estado:
+                  </label>
+                  <select
+                    id="status"
+                    className="border p-2 text-black rounded w-full"
+                    value={editingTask.status || ""}
+                    onChange={e => setEditingTask({ ...editingTask, status: e.target.value })}
+                  >
+                    {TASK_STATUSES.map(status => (
+                      <option key={status.value} value={status.value}>{status.value}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="due_date" className="block text-sm font-medium mb-1">
+                    Fecha de Entrega:
+                  </label>
+                  <input
+                    id="due_date"
+                    type="date"
+                    className="border p-2 text-black rounded w-full"
+                    value={editingTask.due_date || ""}
+                    onChange={e => setEditingTask({ ...editingTask, due_date: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="area" className="block text-sm font-medium mb-1">
+                    Área:
+                  </label>
+                  <select
+                    id="area"
+                    className="border p-2 text-black rounded w-full"
+                    value={editingTask.area || ""}
+                    onChange={e => setEditingTask({ ...editingTask, area: e.target.value })}
+                  >
+                    <option value="">Seleccionar Área</option>
+                    {AREA_OPTIONS.map(area => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button 
+                onClick={cancelEditing}
+                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleUpdateTask}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              >
+                Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {taskModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Crear Nueva Tarea</h3>
             
             {updateError && (
@@ -742,104 +670,86 @@ export default function AdminPanel() {
               </div>
             )}
             
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="title" className="block text-sm font-medium mb-1">
-                  Título de la Tarea*:
-                </label>
-                <input
-                  id="title"
-                  type="text"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  className="border p-2 text-black rounded w-full"
-                  placeholder="Título de la tarea"
-                  required
-                />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="new-title" className="block text-sm font-medium mb-1">
+                    Título*:
+                  </label>
+                  <input
+                    id="new-title"
+                    type="text"
+                    className="border p-2 text-black rounded w-full"
+                    placeholder="Título"
+                    value={newTask.title}
+                    onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="new-status" className="block text-sm font-medium mb-1">
+                    Estado:
+                  </label>
+                  <select
+                    id="new-status"
+                    className="border p-2 text-black rounded w-full"
+                    value={newTask.status}
+                    onChange={e => setNewTask({ ...newTask, status: e.target.value })}
+                  >
+                    {TASK_STATUSES.map(status => (
+                      <option key={status.value} value={status.value}>{status.value}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="new-due_date" className="block text-sm font-medium mb-1">
+                    Fecha de Entrega:
+                  </label>
+                  <input
+                    id="new-due_date"
+                    type="date"
+                    className="border p-2 text-black rounded w-full"
+                    value={newTask.due_date}
+                    onChange={e => setNewTask({ ...newTask, due_date: e.target.value })}
+                  />
+                </div>
               </div>
               
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium mb-1">
-                  Descripción:
-                </label>
-                <textarea
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  className="border p-2 text-black rounded w-full"
-                  placeholder="Descripción de la tarea"
-                  rows={3}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="client_id" className="block text-sm font-medium mb-1">
-                  Cliente*:
-                </label>
-                <select
-                  id="client_id"
-                  value={newTask.client_id}
-                  onChange={(e) => setNewTask({ ...newTask, client_id: e.target.value })}
-                  className="border p-2 text-black rounded w-full"
-                  required
-                >
-                  <option value="">Seleccionar Cliente</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium mb-1">
-                  Estado:
-                </label>
-                <select
-                  id="status"
-                  value={newTask.status}
-                  onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
-                  className="border p-2 text-black rounded w-full"
-                >
-                  {TASK_STATUSES.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.value}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="area" className="block text-sm font-medium mb-1">
-                  Área:
-                </label>
-                <select
-                  id="area"
-                  value={newTask.area}
-                  onChange={(e) => setNewTask({ ...newTask, area: e.target.value })}
-                  className="border p-2 text-black rounded w-full"
-                >
-                  <option value="">Seleccionar Área</option>
-                  {AREA_OPTIONS.map((area) => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="due_date" className="block text-sm font-medium mb-1">
-                  Fecha de Vencimiento:
-                </label>
-                <input
-                  id="due_date"
-                  type="date"
-                  value={newTask.due_date}
-                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                  className="border p-2 text-black rounded w-full"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="new-area" className="block text-sm font-medium mb-1">
+                    Área:
+                  </label>
+                  <select
+                    id="new-area"
+                    className="border p-2 text-black rounded w-full"
+                    value={newTask.area}
+                    onChange={e => setNewTask({ ...newTask, area: e.target.value })}
+                  >
+                    <option value="">Seleccionar Área</option>
+                    {AREA_OPTIONS.map(area => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="new-client" className="block text-sm font-medium mb-1">
+                    Cliente:
+                  </label>
+                  <select
+                    id="new-client"
+                    className="border p-2 text-black rounded w-full"
+                    value={newTask.client_id}
+                    onChange={e => setNewTask({ ...newTask, client_id: e.target.value })}
+                  >
+                    <option value="">Seleccionar Cliente</option>
+                    {clients.map(client => (
+                      <option key={client.id} value={client.id}>{client.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
             
@@ -854,7 +764,7 @@ export default function AdminPanel() {
                 onClick={handleCreateTask}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
               >
-                Crear Tarea
+                Crear
               </button>
             </div>
           </div>
