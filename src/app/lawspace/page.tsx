@@ -112,7 +112,7 @@ const Workspace: React.FC = () => {
   const fetchUsers = useCallback(async (token: string) => {
     setIsLoadingUsers(true);
     try {
-      const response = await axios.get(`${API_URL}/users/get_all_users`, {
+      const response = await axios.get(`${API_URL}/users/get_users_B`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const fetchedUsers = response.data as User[];

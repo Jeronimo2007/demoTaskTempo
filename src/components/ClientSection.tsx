@@ -164,7 +164,7 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
   const fetchUsers = useCallback(async () => {
     try {
       const token = getToken();
-      const response = await axios.get(`${API_URL}/users/get_all_users`, {
+      const response = await axios.get(`${API_URL}/users/get_users_B`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(response.data);
@@ -543,7 +543,7 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                                 <li key={lawyerId}>{user.username}</li>
                               ) : (
                                 <li key={lawyerId} className="text-gray-500">
-                                  Usuario no encontrado (ID: {lawyerId})
+                                  Abogado Desvinculado
                                 </li>
                               );
                             })}
