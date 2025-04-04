@@ -44,7 +44,7 @@ const EventsPanel = () => {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
 
   // Get auth state from context
-  const { isAuthenticated, user, logout } = useAuth(); // Use useAuth hook
+  const { isAuthenticated, logout } = useAuth(); // Use useAuth hook
 
   // Function to get token from cookies
   const getToken = useCallback(() => {
