@@ -6,13 +6,14 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 type User = {
   id: string;
   name: string;
+  role: string; // Add role field
   // Add other fields as needed
 };
 
 type AuthContextType = {
-  user: User | null;
+  user: User | null; // User object now includes role
   isAuthenticated: boolean;
-  login: (userData: User) => void;
+  login: (userData: User) => void; // userData should include role
   logout: () => void;
 };
 

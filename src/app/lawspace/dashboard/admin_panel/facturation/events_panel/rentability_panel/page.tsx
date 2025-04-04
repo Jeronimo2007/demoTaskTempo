@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Table, Collapse } from 'antd';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
 
 const { Panel } = Collapse;
 
@@ -393,22 +394,24 @@ const ClientsContributions = () => {
 
 export default function RentabilityPanelPage() {
   return (
-    <div className="p-6 text-black">
-      <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">Panel de Rentabilidad</h1>
-      <Collapse defaultActiveKey={['1']}>
-        <Panel header="Resumen de Rentabilidad de SSL" key="1">
-          <OfficeRentabilitySummary />
-        </Panel>
-        <Panel header="Coste por Hora de Abogados" key="2">
-          <LawyersCostVsHours />
-        </Panel>
-        <Panel header="Carga de Abogados por Semana" key="3">
-          <LawyersWeeklyWorkload />
-        </Panel>
-         <Panel header="Contribuciones de Clientes" key="4">
-          <ClientsContributions />
-        </Panel>
-      </Collapse>
-    </div>
+    <ProtectedRoute allowedRoles={['socio']}>
+      <div className="p-6 text-black">
+        <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">Panel de Rentabilidad</h1>
+        <Collapse defaultActiveKey={['1']}>
+          <Panel header="Resumen de Rentabilidad de SSL" key="1">
+            <OfficeRentabilitySummary />
+          </Panel>
+          <Panel header="Coste por Hora de Abogados" key="2">
+            <LawyersCostVsHours />
+          </Panel>
+          <Panel header="Carga de Abogados por Semana" key="3">
+            <LawyersWeeklyWorkload />
+          </Panel>
+           <Panel header="Contribuciones de Clientes" key="4">
+            <ClientsContributions />
+          </Panel>
+        </Collapse>
+      </div>
+    </ProtectedRoute>
   );
 }

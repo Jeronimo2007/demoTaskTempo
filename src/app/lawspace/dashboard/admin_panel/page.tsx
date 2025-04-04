@@ -1,13 +1,15 @@
 'use client'
 
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/useAuthStore";
+// import { useAuthStore } from "@/store/useAuthStore"; // Remove useAuthStore
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faPlus, faEdit, faRotate } from "@fortawesome/free-solid-svg-icons";
 import ClientSection from "@/components/ClientSection";
 import ReportDownload from "@/components/ReportDownload";
+import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
 
 type ClientData = {
   id: number;
@@ -52,7 +54,8 @@ const stringifyId = (id: string | number): string => {
 };
 
 export default function AdminPanel() {
-  const { setUser } = useAuthStore();
+  // const { setUser } = useAuthStore(); // Remove useAuthStore usage
+  const { user, isAuthenticated, logout } = useAuth(); // Use useAuth hook
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -93,41 +96,17 @@ export default function AdminPanel() {
       .split('; ')
       .find((row) => row.startsWith('token='))
       ?.split('=')[1] || "";
-    
+
     console.log("%c=== TOKEN CHECK ===", "color: blue; font-weight: bold");
     console.log("All cookies:", document.cookie);
     console.log("Found token:", token ? "Yes" : "No");
     console.log("Token value:", token);
     console.log("%c==================", "color: blue; font-weight: bold");
-    
+
     return token;
   }, []);
 
-  // Function to fetch user data with token
-  const fetchUserData = useCallback(async (token: string) => {
-    console.log("%c=== FETCH USER DATA ===", "color: green; font-weight: bold");
-    try {
-      const response = await axios.get(`${API_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.data) {
-        console.log("User data from API:", response.data);
-        console.log("Current user role:", response.data.role);
-        // Update store with user data
-        setUser(response.data, token);
-        console.log("User data updated in store");
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      return false;
-    } finally {
-      console.log("%c=====================", "color: green; font-weight: bold");
-    }
-  }, [setUser]);
-
+  // Removed fetchUserData function as user data is handled by AuthContext/ProtectedRoute
   const fetchClients = useCallback(async () => {
     try {
       const token = getToken();
@@ -153,92 +132,35 @@ export default function AdminPanel() {
     }
   }, [getToken]);
 
+  // Simplified initialization effect relying on ProtectedRoute for auth/role checks
   useEffect(() => {
-    const initializePage = async () => {
-      console.log("%c=== PAGE INITIALIZATION ===", "color: purple; font-weight: bold");
+    const fetchData = async () => {
       setIsLoading(true);
-
-      const token = getToken();
-
-      if (!token) {
-        console.log("No token found, redirecting to login.");
-        router.push('/login');
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        // First check if user is authenticated and has correct role
-        console.log("Fetching user data from API...");
-        const userResponse = await axios.get(`${API_URL}/users/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const userData = userResponse.data;
-        console.log("User data received:", userData);
-        console.log("User role:", userData?.role);
-        
-        // Check if user exists and has correct role
-        const authorizedRoles = ["socio", "senior", "consultor"];
-        console.log("Checking authorization...");
-        console.log("Authorized roles:", authorizedRoles);
-        console.log("User role:", userData?.role);
-        console.log("Is authorized:", authorizedRoles.includes(userData?.role));
-        
-        if (!userData || !authorizedRoles.includes(userData.role)) {
-          console.log(`User role "${userData?.role}" not authorized, redirecting.`);
-          router.push("/"); // Redirect to home or an 'unauthorized' page
-          setIsLoading(false);
-          return;
-        }
-
-        // Update store with user data
-        console.log("Updating user in store...");
-        setUser(userData, token);
-        
-        // Log current store state
-        const currentStoreUser = useAuthStore.getState().user;
-        console.log("Current store user:", currentStoreUser);
-
-        // Only fetch data if user is authorized
-        console.log("Fetching clients and tasks...");
+        // ProtectedRoute ensures we only get here if authenticated and authorized
         await Promise.all([fetchClients(), fetchTasks()]);
-        console.log("Clients and tasks fetched successfully.");
       } catch (error) {
-        console.error('Error during initialization:', error);
-        if (axios.isAxiosError(error) && error.response?.status === 401) {
-          console.log("Token is invalid or expired, redirecting to login");
-          router.push('/login');
-        } else {
-          setUpdateError("Error al cargar los datos. Por favor, intente nuevamente.");
-        }
+         console.error('Error fetching data:', error);
+         setUpdateError("Error al cargar los datos. Por favor, intente nuevamente.");
+         // Handle potential 401 if token becomes invalid between ProtectedRoute check and API calls
+         if (axios.isAxiosError(error) && error.response?.status === 401) {
+           console.log("Token became invalid, logging out and redirecting");
+           logout(); // Clear auth context state
+           router.push('/login');
+         }
       } finally {
         setIsLoading(false);
-        console.log("%c=========================", "color: purple; font-weight: bold");
       }
     };
 
-    initializePage();
-  }, [router, getToken, fetchClients, fetchTasks, setUser]);
-
-  // Add a check for unauthorized access when component mounts
-  useEffect(() => {
-    console.log("%c=== COMPONENT MOUNT CHECK ===", "color: orange; font-weight: bold");
-    const currentUser = useAuthStore.getState().user;
-    console.log("Current user from store:", currentUser);
-    
-    const authorizedRoles = ["socio", "senior", "consultor"];
-    console.log("Checking authorization on mount...");
-    console.log("User role:", currentUser?.role);
-    console.log("Is authorized:", currentUser ? authorizedRoles.includes(currentUser.role) : false);
-    
-    if (currentUser && !authorizedRoles.includes(currentUser.role)) {
-      console.log(`Unauthorized access attempt by user with role "${currentUser.role}"`);
-      router.push("/");
+    // Only fetch data if authenticated and user object exists (ensured by ProtectedRoute)
+    if (isAuthenticated && user) {
+      fetchData();
     }
-    console.log("%c=========================", "color: orange; font-weight: bold");
-  }, [router]);
+    // Add dependencies: isAuthenticated, user, fetchClients, fetchTasks, logout, router
+  }, [isAuthenticated, user, fetchClients, fetchTasks, logout, router]);
 
+  // The useEffect block previously here (lines 225-240 in original) is removed as ProtectedRoute handles the check.
   const openTaskModal = () => {
     setNewTask({
       title: "",
@@ -500,340 +422,200 @@ export default function AdminPanel() {
     return date.toISOString().split('T')[0]; // This will give YYYY-MM-DD format
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  // Loading state check will be inside ProtectedRoute
 
 
+  // Wrap the entire component return in ProtectedRoute
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Panel de Administración</h1>
-
-      {/* Clients Section */}
-      <ClientSection />
-
-      {/* Tasks Section */}
-      <div className="p-6 text-black shadow-lg rounded-lg bg-white mt-10">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Gestión de Tareas</h2>
-          <div className="flex gap-4">
-            <select
-              value={clientFilter}
-              onChange={handleClientFilterChange}
-              className="p-2 border rounded text-black"
-            >
-              <option value="">Todos los Clientes</option>
-              {clients.map(client => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => {
-                setIsLoading(true);
-                fetchTasks().finally(() => setIsLoading(false));
-              }}
-              className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
-              title="Actualizar lista de tareas"
-            >
-              <FontAwesomeIcon icon={faRotate} className="mr-2" />
-              Actualizar
-            </button>
-            <button
-              onClick={openTaskModal}
-              className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-            >
-              <FontAwesomeIcon icon={faPlus} className="mr-2" />
-              Nueva Tarea
-            </button>
-          </div>
+    <ProtectedRoute allowedRoles={['senior', 'socio', 'consultor']}>
+      {isLoading ? (
+        // Loading state shown while ProtectedRoute is potentially verifying or data is loading
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
+      ) : (
+        // Actual content rendered only if authorized and not loading
+        <div className="container mx-auto p-4">
+          <h1 className="text-2xl font-bold mb-4">Panel de Administración</h1>
 
-        {updateError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p>{updateError}</p>
-          </div>
-        )}
+          {/* Clients Section */}
+          <ClientSection />
 
-        <div className="overflow-x-auto">
-          <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border-b border-black p-2 text-left">Título</th>
-                <th className="border-b border-black p-2 text-left">Cliente</th>
-                <th className="border-b border-black p-2 text-left">Fecha de Entrega</th>
-                <th className="border-b border-black p-2 text-left">Área</th>
-                <th className="border-b border-black p-2 text-left">Estado</th>
-                <th className="p-2 text-left">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedTasks.map(task => (
-                <tr key={task.id} className="hover:bg-gray-50">
-                  <td className="border-b border-black p-2">{task.title}</td>
-                  <td className="border-b border-black p-2">{task.client}</td>
-                  <td className="border-b border-black p-2">{formatDate(task.due_date)}</td>
-                  <td className="border-b border-black p-2">{task.area}</td>
-                  <td className="border-b border-black p-2">
-                    <span className={`inline-flex items-center justify-center px-2 py-1 text-xs font-bold rounded ${getStatusColor(task.status)} text-white`}>
-                      {task.status}
-                    </span>
-                  </td>
-                  <td className="p-2 flex space-x-2">
-                    <button
-                      onClick={() => startEditingTask(task)}
-                      className="flex items-center text-blue-600 hover:text-blue-800 transition"
-                      title="Editar tarea"
-                    >
-                      <FontAwesomeIcon icon={faEdit} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTask(task.id)}
-                      className="text-red-600 hover:text-red-800 transition"
-                      title="Eliminar tarea"
-                    >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          {/* Tasks Section */}
+          <div className="p-6 text-black shadow-lg rounded-lg bg-white mt-10">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Gestión de Tareas</h2>
+              <div className="flex gap-4">
+                <select
+                  value={clientFilter}
+                  onChange={handleClientFilterChange}
+                  className="p-2 border rounded text-black"
+                >
+                  <option value="">Todos los Clientes</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    setIsLoading(true);
+                    fetchTasks().finally(() => setIsLoading(false));
+                  }}
+                  className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+                  title="Actualizar lista de tareas"
+                >
+                  <FontAwesomeIcon icon={faRotate} className="mr-2" />
+                  Actualizar
+                </button>
+                <button
+                  onClick={openTaskModal}
+                  className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                >
+                  <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                  Nueva Tarea
+                </button>
+              </div>
+            </div>
 
-        {/* Pagination */}
-        <div className="flex justify-between items-center mt-4">
-          <button
-            onClick={() => setCurrentTaskPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentTaskPage === 1}
-            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
-          >
-            Anterior
-          </button>
-          <span className="text-gray-700">
-            Página {currentTaskPage} de {totalTaskPages}
-          </span>
-          <button
-            onClick={() => setCurrentTaskPage(prev => Math.min(prev + 1, totalTaskPages))}
-            disabled={currentTaskPage === totalTaskPages}
-            className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
-          >
-            Siguiente
-          </button>
-        </div>
-      </div>
-
-      {editingTaskId !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Editar Tarea</h3>
-            
             {updateError && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
                 <p>{updateError}</p>
               </div>
             )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="title" className="block text-sm font-medium mb-1">
-                    Título*:
-                  </label>
-                  <input
-                    id="title"
-                    type="text"
-                    className="border p-2 text-black rounded w-full"
-                    placeholder="Título"
-                    value={editingTask.title || ""}
-                    onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium mb-1">
-                    Estado:
-                  </label>
-                  <select
-                    id="status"
-                    className="border p-2 text-black rounded w-full"
-                    value={editingTask.status || ""}
-                    onChange={e => setEditingTask({ ...editingTask, status: e.target.value })}
-                  >
-                    {TASK_STATUSES.map(status => (
-                      <option key={status.value} value={status.value}>{status.value}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label htmlFor="due_date" className="block text-sm font-medium mb-1">
-                    Fecha de Entrega:
-                  </label>
-                  <input
-                    id="due_date"
-                    type="date"
-                    className="border p-2 text-black rounded w-full"
-                    value={editingTask.due_date || ""}
-                    onChange={e => setEditingTask({ ...editingTask, due_date: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="area" className="block text-sm font-medium mb-1">
-                    Área:
-                  </label>
-                  <select
-                    id="area"
-                    className="border p-2 text-black rounded w-full"
-                    value={editingTask.area || ""}
-                    onChange={e => setEditingTask({ ...editingTask, area: e.target.value })}
-                  >
-                    <option value="">Seleccionar Área</option>
-                    {AREA_OPTIONS.map(area => (
-                      <option key={area} value={area}>{area}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border-b border-black p-2 text-left">Título</th>
+                    <th className="border-b border-black p-2 text-left">Cliente</th>
+                    <th className="border-b border-black p-2 text-left">Fecha de Entrega</th>
+                    <th className="border-b border-black p-2 text-left">Área</th>
+                    <th className="border-b border-black p-2 text-left">Estado</th>
+                    <th className="p-2 text-left">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedTasks.map(task => (
+                    <tr key={task.id} className="hover:bg-gray-50">
+                      <td className="border-b border-black p-2">{task.title}</td>
+                      <td className="border-b border-black p-2">{task.client}</td>
+                      <td className="border-b border-black p-2">{formatDate(task.due_date)}</td>
+                      <td className="border-b border-black p-2">{task.area}</td>
+                      <td className="border-b border-black p-2">
+                        <span className={`inline-flex items-center justify-center px-2 py-1 text-xs font-bold rounded ${getStatusColor(task.status)} text-white`}>
+                          {task.status}
+                        </span>
+                      </td>
+                      <td className="p-2">
+                        {editingTaskId === task.id ? (
+                          <div className="flex gap-2">
+                            <button onClick={handleUpdateTask} className="text-green-600 hover:text-green-800">Guardar</button>
+                            <button onClick={cancelEditing} className="text-gray-600 hover:text-gray-800">Cancelar</button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button onClick={() => startEditingTask(task)} className="text-blue-600 hover:text-blue-800">
+                              <FontAwesomeIcon icon={faEdit} />
+                            </button>
+                            <button onClick={() => handleDeleteTask(task.id)} className="text-red-600 hover:text-red-800">
+                              <FontAwesomeIcon icon={faTrash} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button 
-                onClick={cancelEditing}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition"
+
+            {/* Task Pagination */}
+            <div className="flex justify-between items-center mt-4">
+              <button
+                onClick={() => setCurrentTaskPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentTaskPage === 1}
+                className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
               >
-                Cancelar
+                Anterior
               </button>
-              <button 
-                onClick={handleUpdateTask}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              <span>Página {currentTaskPage} de {totalTaskPages}</span>
+              <button
+                onClick={() => setCurrentTaskPage(prev => Math.min(prev + 1, totalTaskPages))}
+                disabled={currentTaskPage === totalTaskPages}
+                className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
               >
-                Actualizar
+                Siguiente
               </button>
             </div>
           </div>
-        </div>
-      )}
 
-      {taskModal.isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Crear Nueva Tarea</h3>
-            
-            {updateError && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                <p>{updateError}</p>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="new-title" className="block text-sm font-medium mb-1">
-                    Título*:
-                  </label>
-                  <input
-                    id="new-title"
-                    type="text"
-                    className="border p-2 text-black rounded w-full"
-                    placeholder="Título"
-                    value={newTask.title}
-                    onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="new-status" className="block text-sm font-medium mb-1">
-                    Estado:
-                  </label>
-                  <select
-                    id="new-status"
-                    className="border p-2 text-black rounded w-full"
-                    value={newTask.status}
-                    onChange={e => setNewTask({ ...newTask, status: e.target.value })}
-                  >
-                    {TASK_STATUSES.map(status => (
-                      <option key={status.value} value={status.value}>{status.value}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label htmlFor="new-due_date" className="block text-sm font-medium mb-1">
-                    Fecha de Entrega:
-                  </label>
-                  <input
-                    id="new-due_date"
-                    type="date"
-                    className="border p-2 text-black rounded w-full"
-                    value={newTask.due_date}
-                    onChange={e => setNewTask({ ...newTask, due_date: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="new-area" className="block text-sm font-medium mb-1">
-                    Área:
-                  </label>
-                  <select
-                    id="new-area"
-                    className="border p-2 text-black rounded w-full"
-                    value={newTask.area}
-                    onChange={e => setNewTask({ ...newTask, area: e.target.value })}
-                  >
-                    <option value="">Seleccionar Área</option>
-                    {AREA_OPTIONS.map(area => (
-                      <option key={area} value={area}>{area}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label htmlFor="new-client" className="block text-sm font-medium mb-1">
-                    Cliente:
-                  </label>
-                  <select
-                    id="new-client"
-                    className="border p-2 text-black rounded w-full"
-                    value={newTask.client_id}
-                    onChange={e => setNewTask({ ...newTask, client_id: e.target.value })}
-                  >
-                    <option value="">Seleccionar Cliente</option>
-                    {clients.map(client => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
-                  </select>
+          {/* Report Download Section */}
+          <ReportDownload clients={clients} />
+
+          {/* Task Creation Modal */}
+          {taskModal.isOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+                <h3 className="text-lg font-semibold mb-4 text-black">Crear Nueva Tarea</h3>
+                {updateError && <p className="text-red-500 mb-4">{updateError}</p>}
+                <input
+                  type="text"
+                  placeholder="Título"
+                  value={newTask.title}
+                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                  className="w-full p-2 border rounded mb-2 text-black"
+                />
+                <textarea
+                  placeholder="Descripción (opcional)"
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  className="w-full p-2 border rounded mb-2 text-black"
+                />
+                <select
+                  value={newTask.status}
+                  onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+                  className="w-full p-2 border rounded mb-2 text-black"
+                >
+                  {TASK_STATUSES.map(status => (
+                    <option key={status.value} value={status.value}>{status.value}</option>
+                  ))}
+                </select>
+                <select
+                  value={newTask.client_id}
+                  onChange={(e) => setNewTask({ ...newTask, client_id: e.target.value })}
+                  className="w-full p-2 border rounded mb-2 text-black"
+                >
+                  <option value="">Seleccionar Cliente</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={newTask.area}
+                  onChange={(e) => setNewTask({ ...newTask, area: e.target.value })}
+                  className="w-full p-2 border rounded mb-2 text-black"
+                >
+                  <option value="">Seleccionar Área</option>
+                  {AREA_OPTIONS.map(area => (
+                    <option key={area} value={area}>{area}</option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={newTask.due_date}
+                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                  className="w-full p-2 border rounded mb-4 text-black"
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={closeTaskModal} className="px-4 py-2 bg-gray-300 rounded text-black">Cancelar</button>
+                  <button onClick={handleCreateTask} className="px-4 py-2 bg-blue-600 text-white rounded">Crear Tarea</button>
                 </div>
               </div>
             </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <button 
-                onClick={closeTaskModal}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleCreateTask}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-              >
-                Crear
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
-
-      <ReportDownload clients={clients} />
-    </div>
+    </ProtectedRoute>
   );
 }
