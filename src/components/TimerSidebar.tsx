@@ -412,6 +412,15 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
       }
       return t;
     }));
+
+    // After saving and resetting, remove the timer from the list
+    removeTimer(timerId);
+
+    // Clean up localStorage if no active timers remain
+    const remainingActiveTimers = timers.filter(t => t.id !== timerId && (t.isRunning || t.isPaused));
+    if (remainingActiveTimers.length === 0) {
+      localStorage.removeItem('multiTimerState');
+    }
   };
 
   // Reset a timer without saving

@@ -66,6 +66,9 @@ const Workspace: React.FC = () => {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const tasksPerPage = 6; // Number of tasks per page, adjust as needed
+
   interface ClientOption {
     id: string;
     label: string;
@@ -561,23 +564,48 @@ const Workspace: React.FC = () => {
             No hay tareas disponibles. {!hasElevatedPermissions() && "Crea una tarea o contacta a un abogado senior o socio para que te asigne una."}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTasks.map((task) => {
-              return (
-                <div
-                  key={task.id}
-                  className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
-                  style={{ borderLeft: `4px solid ${getStatusColor(task.status)}` }}
-                >
-                  <h3 className="font-medium text-lg">{task.title}</h3>
-                  <div className="mt-2 text-sm text-gray-600">
-                    <p><span className="font-medium">Estado:</span> {task.status}</p>
-                    <p><span className="font-medium">Fecha de Vencimiento:</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Sin fecha'}</p>
-                    <p><span className="font-medium">Cliente:</span> {task.client_name || 'Cliente no asignado'}</p>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-col items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTasks
+                .slice((currentPage - 1) * tasksPerPage, currentPage * tasksPerPage)
+                .map((task) => {
+                  return (
+                    <div
+                      key={task.id}
+                      className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                      style={{ borderLeft: `4px solid ${getStatusColor(task.status)}` }}
+                    >
+                      <h3 className="font-medium text-lg">{task.title}</h3>
+                      <div className="mt-2 text-sm text-gray-600">
+                        <p><span className="font-medium">Estado:</span> {task.status}</p>
+                        <p><span className="font-medium">Fecha de Vencimiento:</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Sin fecha'}</p>
+                        <p><span className="font-medium">Cliente:</span> {task.client_name || 'Cliente no asignado'}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+            <div className="flex justify-center mt-4 space-x-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border rounded disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="px-3 py-1">{currentPage}</span>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) =>
+                    prev < Math.ceil(filteredTasks.length / tasksPerPage) ? prev + 1 : prev
+                  )
+                }
+                disabled={currentPage >= Math.ceil(filteredTasks.length / tasksPerPage)}
+                className="px-3 py-1 border rounded disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         )}
       </div>
