@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faPlus, faEdit, faSearch, faRotate } from "@fortawesome/free-solid-svg-icons";
@@ -117,6 +117,7 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     clientId: null,
     clientName: ""
   });
+  const [expandedClientId, setExpandedClientId] = useState<number | null>(null); // State for expanded row
   
   // Add search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -452,6 +453,10 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     setCurrentPage(1);
   }, [searchTerm]);
 
+  const handleRowClick = (clientId: number) => {
+    setExpandedClientId(prevId => (prevId === clientId ? null : clientId));
+  };
+
   return (
     <div className="p-6 text-black shadow-lg rounded-lg bg-white">
       <div className="flex justify-between items-center mb-4">
@@ -511,8 +516,7 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border-b border-black p-2 text-left">Nombre</th>
-                  <th className="border-b border-black p-2 text-left">NIT</th>
-                  <th className="border-b border-black p-2 text-left">Contacto</th>
+                  {/* Removed NIT and Contacto headers */}
                   <th className="border-b border-black p-2 text-left">Abogados Asignados</th>
                   <th className="border-b border-black p-2 text-left">Asesoría Permanente</th>
                   <th className="border-b border-black p-2 text-left">Límite Mensual (Horas)</th>
@@ -521,69 +525,86 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
               </thead>
               <tbody>
                 {paginatedClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50">
-                    <td className="border-b border-black p-2">{client.name}</td>
-                    <td className="border-b border-black p-2">{client.nit || "-"}</td>
-                    <td className="border-b border-black p-2">
-                      <div className="text-sm">
-                        {client.phone && <p><span className="font-medium">Tel:</span> {client.phone}</p>}
-                        {client.email && <p><span className="font-medium">Email:</span> {client.email}</p>}
-                        {client.city && <p><span className="font-medium">Ciudad:</span> {client.city}</p>}
-                        {client.address && <p className="truncate max-w-[150px]"><span className="font-medium">Dir:</span> {client.address}</p>}
-                        {!client.phone && !client.email && !client.city && !client.address && "-"}
-                      </div>
-                    </td>
-                    <td className="border-b border-black p-2">
-                      <div>
-                        {client.lawyers && client.lawyers.length > 0 ? (
-                          <ul className="list-disc pl-5">
-                            {client.lawyers.map((lawyerId) => {
-                              const user = users.find((u) => u.id === lawyerId);
-                              return user ? (
-                                <li key={lawyerId}>{user.username}</li>
-                              ) : (
-                                <li key={lawyerId} className="text-gray-500">
-                                  Abogado Desvinculado
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        ) : (
-                          <span className="text-gray-500">Sin abogados asignados</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="border-b border-black p-2">
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold inline-block text-center ${
-                        client.permanent 
-                          ? "bg-green-500 text-white" 
-                          : "bg-gray-300 text-gray-700"
-                      }`}>
-                        {client.permanent ? "Sí" : "No"}
-                      </div>
-                    </td>
-                    <td className="border-b border-black p-2">
-                      <span>
-                        {client.permanent ? 
-                          (client.monthly_limit_hours ? `${client.monthly_limit_hours} horas` : "No especificado") : 
-                          "N/A"}
-                      </span>
-                    </td>
-                    <td className="p-2 flex space-x-2">
-                      <button 
-                        onClick={() => openEditClientModal(client)} 
-                        className="flex items-center text-blue-600 hover:text-blue-800 transition"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button 
-                        onClick={() => openDeleteConfirmation(client)} 
-                        className="text-red-600 hover:text-red-800 transition"
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={client.id}>
+                    <tr
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleRowClick(client.id)}
+                    >
+                      <td className="border-b border-black p-2">{client.name}</td>
+                      {/* Removed NIT and Contacto cells */}
+                      <td className="border-b border-black p-2">
+                        <div>
+                          {client.lawyers && client.lawyers.length > 0 ? (
+                            <ul className="list-disc pl-5">
+                              {client.lawyers.map((lawyerId) => {
+                                const user = users.find((u) => u.id === lawyerId);
+                                return user ? (
+                                  <li key={lawyerId}>{user.username}</li>
+                                ) : (
+                                  <li key={lawyerId} className="text-gray-500">
+                                    Abogado Desvinculado
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <span className="text-gray-500">Sin abogados asignados</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="border-b border-black p-2">
+                        <div className={`px-3 py-1 rounded-full text-xs font-semibold inline-block text-center ${
+                          client.permanent
+                            ? "bg-green-500 text-white"
+                            : "bg-gray-300 text-gray-700"
+                        }`}>
+                          {client.permanent ? "Sí" : "No"}
+                        </div>
+                      </td>
+                      <td className="border-b border-black p-2">
+                        <span>
+                          {client.permanent ?
+                            (client.monthly_limit_hours ? `${client.monthly_limit_hours} horas` : "No especificado") :
+                            "N/A"}
+                        </span>
+                      </td>
+                      <td className="p-2 flex space-x-2">
+                        {/* Stop propagation to prevent row click when clicking buttons */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEditClientModal(client); }}
+                          className="flex items-center text-blue-600 hover:text-blue-800 transition"
+                          title="Editar Cliente"
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openDeleteConfirmation(client); }}
+                          className="text-red-600 hover:text-red-800 transition"
+                          title="Eliminar Cliente"
+                        >
+                          <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                      </td>
+                    </tr>
+                    {/* Expanded Row for Details */}
+                    {expandedClientId === client.id && (
+                      <tr className="bg-gray-100">
+                        <td colSpan={5} className="p-4 border-b border-black"> {/* Adjusted colSpan */}
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p><span className="font-semibold">NIT:</span> {client.nit || "-"}</p>
+                              <p><span className="font-semibold">Teléfono:</span> {client.phone || "-"}</p>
+                              <p><span className="font-semibold">Email:</span> {client.email || "-"}</p>
+                            </div>
+                            <div>
+                              <p><span className="font-semibold">Ciudad:</span> {client.city || "-"}</p>
+                              <p><span className="font-semibold">Dirección:</span> {client.address || "-"}</p>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

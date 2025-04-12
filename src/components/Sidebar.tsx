@@ -54,21 +54,14 @@ export default function Sidebar() {
         </button>)}
         {user && ['admin', 'socio', 'senior'].includes(user.role) && (
         <button
-          onClick={() => router.push("/lawspace/dashboard/admin_panel/facturation")}
-          className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
-        >
-          Ordenes De Servicio
-        </button>)}
-        {user && ['admin', 'socio', 'senior'].includes(user.role) && (
-        <button
-          onClick={() => router.push("/lawspace/dashboard/admin_panel/facturation/events_panel")}
+          onClick={() => router.push("/lawspace/dashboard/admin_panel/events_panel")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
         >
           Eventos
         </button>)}
         {user && ['admin', 'socio'].includes(user.role) && (
         <button
-          onClick={() => router.push("/lawspace/dashboard/admin_panel/facturation/events_panel/rentability_panel")}
+          onClick={() => router.push("/lawspace/dashboard/admin_panel/events_panel/rentability_panel")}
           className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
         >
           Rentabilidad

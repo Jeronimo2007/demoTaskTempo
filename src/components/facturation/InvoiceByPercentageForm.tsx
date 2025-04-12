@@ -2,17 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import axios, { AxiosResponse } from 'axios';
-import ContractManager from '../contracts/ContractManager';
 
 // Updated interface with contract_id parameter, making some fields optional with nullable types
+import { Task } from "@/types/task";
+
 interface InvoiceByPercentageFormData {
   client_id: number | null;
-  contract_id: number | null;
+  task_id: number | null;
   percentage: number | null;
   payment_type: "anticipo" | "fracción" | "final" | null;
   currency: "COP" | "USD";
   exchange_rate?: number | null;
-  include_tax: boolean; // Field for tax inclusion
 }
 
 interface Client {
@@ -21,14 +21,6 @@ interface Client {
   // Other client fields are omitted for brevity
 }
 
-interface Contract {
-  id: number;
-  description?: string;
-  total_value: number;
-  start_date: string;
-  end_date?: string;
-  active: boolean;
-}
 
 interface InvoiceByPercentageFormProps {
   clients: Client[];
@@ -47,11 +39,9 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
   showNotification,
   onSuccess,
 }) => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loadingContracts, setLoadingContracts] = useState(false);
-  const [showContractManager, setShowContractManager] = useState(false);
-  const [selectedClientForContractManager, setSelectedClientForContractManager] = useState<number | undefined>(undefined);
 
   // Helper function to get auth headers
   const getAuthHeaders = () => {
@@ -67,56 +57,46 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
   const percentageForm = useForm<InvoiceByPercentageFormData>({
     defaultValues: {
       client_id: null,
-      contract_id: null,
+      task_id: null,
       percentage: null,
       payment_type: null,
       currency: "COP",
       exchange_rate: null,
-      include_tax: true, // Default to include tax
     },
   });
-
-  // Watch for changes to client_id to load contracts
-  const selectedClientId = percentageForm.watch('client_id');
-
-  // Load contracts when client changes
+  
+  // Watch for client_id changes to fetch tasks
+  const selectedClientId = percentageForm.watch("client_id");
+  
   useEffect(() => {
     if (selectedClientId) {
-      loadClientContracts(selectedClientId);
+      setLoadingTasks(true);
+      setTasks([]);
+      axios
+        .get(`${API_URL}/tasks/get_tasks_by_client`, {
+          params: { client_id: selectedClientId },
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        })
+        .then((res) => {
+          setTasks(res.data || []);
+        })
+        .catch((err) => {
+          setTasks([]);
+          showNotification("Error", "No se pudieron cargar las tareas del cliente", "error");
+        })
+        .finally(() => setLoadingTasks(false));
     } else {
-      setContracts([]);
+      setTasks([]);
     }
-  }, [selectedClientId]);
+  }, [selectedClientId, API_URL, token, showNotification]);
+
+
+  // Load contracts when client changes
 
   // Function to load contracts for a client
-  const loadClientContracts = async (clientId: number) => {
-    if (!token) {
-      showNotification('Error', 'No autorizado. Por favor inicie sesión', 'error');
-      return;
-    }
-
-    setLoadingContracts(true);
-    try {
-      const authHeaders = getAuthHeaders();
-      const response = await axios.get<Contract[]>(`${API_URL}/contracts/client/${clientId}`, authHeaders);
-      setContracts(response.data);
-      
-      // Reset contract_id when client changes - use null instead of undefined
-      percentageForm.setValue('contract_id', null);
-    } catch (error) {
-      console.error('Error loading contracts:', error);
-      let errorMessage = 'Error al cargar los contratos';
-      
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        errorMessage = 'No autorizado. Verifique su sesión e intente nuevamente.';
-      }
-      
-      showNotification('Error', errorMessage, 'error');
-      setContracts([]);
-    } finally {
-      setLoadingContracts(false);
-    }
-  };
 
   // Helper function to download file from response
   const downloadFile = (response: AxiosResponse<Blob>, defaultFileName: string) => {
@@ -157,57 +137,59 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
       showNotification('Error', 'No autorizado. Por favor inicie sesión', 'error');
       return;
     }
-    
+  
     // Ensure all required fields are present before submission
-    if (data.client_id === null || data.contract_id === null || 
-        data.percentage === null || data.payment_type === null ||
-        (data.currency === "USD" && data.exchange_rate === null)) {
+    if (
+      data.client_id === null ||
+      data.task_id === null ||
+      data.percentage === null ||
+      data.payment_type === null ||
+      (data.currency === "USD" && data.exchange_rate === null)
+    ) {
       showNotification('Error', 'Por favor complete todos los campos requeridos', 'error');
       return;
     }
-    
+  
     setLoading(true);
     try {
       // Include auth token in the request
       const authHeaders = getAuthHeaders();
-      
+  
       // Create a clean version of the data without null values
       const cleanData = {
         client_id: data.client_id,
-        contract_id: data.contract_id,
+        task_id: data.task_id,
         percentage: data.percentage,
         payment_type: data.payment_type,
         currency: data.currency,
         exchange_rate: data.exchange_rate || undefined,
-        include_tax: data.include_tax
       };
-      
+  
       // Set responseType to blob for file download
       const response = await axios.post<Blob>(`${API_URL}/reports/invoices/by-percentage`, cleanData, {
         ...authHeaders,
         responseType: 'blob'
       });
-      
+  
       // Get client name for the filename
       const client = clients.find(c => c.id === data.client_id);
       const clientName = client ? client.name.replace(/\s+/g, '_') : 'cliente';
       const paymentType = data.payment_type || 'pago';
-      
+  
       // Download the file
       downloadFile(response, `factura_porcentaje_${clientName}_${paymentType}.pdf`);
-      
+  
       showNotification('Éxito', 'Factura por porcentaje generada y descargada correctamente', 'success');
       // Reset form with null values instead of undefined
       percentageForm.reset({
         client_id: null,
-        contract_id: null,
+        task_id: null,
         percentage: null,
         payment_type: null,
         currency: "COP",
         exchange_rate: null,
-        include_tax: true,
       });
-      
+  
       // Call the onSuccess callback if provided
       if (onSuccess) {
         onSuccess();
@@ -215,11 +197,11 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
     } catch (error) {
       console.error('Error creating invoice:', error);
       let errorMessage = 'Error al crear la factura por porcentaje';
-      
+  
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         errorMessage = 'No autorizado. Verifique su sesión e intente nuevamente.';
       }
-      
+  
       showNotification('Error', errorMessage, 'error');
     } finally {
       setLoading(false);
@@ -227,23 +209,10 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
   };
 
   // Function to handle opening contract manager
-  const handleOpenContractManager = (clientId?: number) => {
-    setSelectedClientForContractManager(clientId);
-    setShowContractManager(true);
-  };
 
   // Function to handle closing contract manager
-  const handleCloseContractManager = () => {
-    setShowContractManager(false);
-  };
 
   // Function called when contract operations are successful
-  const handleContractSuccess = () => {
-    // Reload contracts for the selected client
-    if (selectedClientId) {
-      loadClientContracts(selectedClientId);
-    }
-  };
 
   return (
     <div className="bg-white rounded-lg border shadow-sm p-6">
@@ -267,7 +236,7 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
                 <select
                   id="percentage-client"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                  {...percentageForm.register("client_id", { 
+                  {...percentageForm.register("client_id", {
                     required: true,
                     valueAsNumber: true
                   })}
@@ -292,66 +261,44 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
               </>
             )}
           </div>
-
-          {/* Contract Selection */}
+          
+          {/* Task Selection (only show after client is selected) */}
           {selectedClientId && (
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label htmlFor="percentage-contract" className="block text-sm font-medium text-black">
-                  Contrato
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleOpenContractManager(selectedClientId)}
-                  className="text-sm text-blue-600 hover:text-blue-800"
-                >
-                  Gestionar Contratos
-                </button>
-              </div>
-              {loadingContracts ? (
-                <div className="text-black">Cargando contratos...</div>
+              <label htmlFor="percentage-task" className="block text-sm font-medium text-black">
+                Tarea
+              </label>
+              {loadingTasks ? (
+                <div className="text-black">Cargando tareas...</div>
               ) : (
                 <>
                   <select
-                    id="percentage-contract"
+                    id="percentage-task"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                    {...percentageForm.register("contract_id", { 
-                      required: true,
-                      valueAsNumber: true
-                    })}
+                    {...percentageForm.register("task_id", { required: true, valueAsNumber: true })}
                   >
-                    <option value="">Selecciona un contrato</option>
-                    {contracts.length > 0 ? (
-                      contracts.map((contract) => (
-                        <option key={contract.id} value={contract.id}>
-                          {contract.description || `Contrato #${contract.id}`} - ${contract.total_value.toLocaleString()} 
-                          ({new Date(contract.start_date).toLocaleDateString()} - 
-                          {contract.end_date ? new Date(contract.end_date).toLocaleDateString() : 'Sin fecha final'})
+                    <option value="">Selecciona una tarea</option>
+                    {tasks.length > 0 ? (
+                      tasks.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
                         </option>
                       ))
                     ) : (
-                      <option disabled>No hay contratos disponibles</option>
+                      <option disabled>No hay tareas disponibles</option>
                     )}
                   </select>
-                  {contracts.length === 0 && (
-                    <p className="text-yellow-600 text-xs mt-1">
-                      No hay contratos disponibles para este cliente.
-                      <button
-                        type="button"
-                        onClick={() => handleOpenContractManager(selectedClientId)}
-                        className="ml-2 text-blue-600 hover:text-blue-800"
-                      >
-                        Crear un contrato
-                      </button>
-                    </p>
+                  {tasks.length === 0 && (
+                    <p className="text-yellow-600 text-xs mt-1">No hay tareas disponibles</p>
                   )}
-                  {percentageForm.formState.errors.contract_id && (
+                  {percentageForm.formState.errors.task_id && (
                     <p className="text-red-500 text-xs mt-1">Este campo es requerido</p>
                   )}
                 </>
               )}
             </div>
           )}
+
 
           {/* Percentage */}
           <div className="space-y-2">
@@ -401,23 +348,6 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
             )}
           </div>
 
-          {/* Include Tax Toggle */}
-          <div className="space-y-2">
-            <label htmlFor="percentage-include-tax" className="block text-sm font-medium text-black">
-              ¿Incluir IVA?
-            </label>
-            <div className="flex items-center">
-              <input
-                id="percentage-include-tax"
-                type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                {...percentageForm.register("include_tax")}
-              />
-              <label htmlFor="percentage-include-tax" className="ml-2 block text-sm text-black">
-                {percentageForm.watch("include_tax") ? "Con IVA" : "Sin IVA"}
-              </label>
-            </div>
-          </div>
 
           {/* Currency Selection */}
           <div className="space-y-2">
@@ -465,9 +395,9 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
 
           <button
             type="submit"
-            disabled={loading || loadingClients || clients.length === 0 || loadingContracts}
+            disabled={loading || loadingClients || clients.length === 0}
             className={`w-full px-4 py-2 text-white font-medium rounded-md ${
-              loading || loadingClients || clients.length === 0 || loadingContracts ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+              loading || loadingClients || clients.length === 0 ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             {loading ? "Generando..." : "Generar y Descargar Factura"}
@@ -475,25 +405,6 @@ const InvoiceByPercentageForm: React.FC<InvoiceByPercentageFormProps> = ({
         </form>
       </div>
 
-      {/* Contract Manager Modal */}
-      {showContractManager && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex">
-          <div className="relative p-4 w-full max-w-4xl m-auto">
-            <div className="relative bg-white rounded-lg shadow">
-              <ContractManager
-                clients={clients}
-                loadingClients={loadingClients}
-                token={token}
-                API_URL={API_URL}
-                showNotification={showNotification}
-                initialClientId={selectedClientForContractManager}
-                onSuccess={handleContractSuccess}
-                onClose={handleCloseContractManager}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

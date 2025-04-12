@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import axios, { AxiosResponse } from 'axios';
 
 // Form interface with the new include_tax parameter
+import { Task } from "@/types/task";
+
 interface InvoiceByHoursFormData {
   client_id: number;
+  task_id: number;
   currency: "COP" | "USD";
   exchange_rate?: number;
   include_tax: boolean; // New field for tax inclusion
@@ -33,6 +36,8 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
   showNotification,
   onSuccess
 }) => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Helper function to get auth headers
@@ -49,11 +54,40 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
   const hoursForm = useForm<InvoiceByHoursFormData>({
     defaultValues: {
       client_id: undefined,
+      task_id: undefined,
       currency: "COP",
       exchange_rate: undefined,
       include_tax: true, // Default to include tax
     },
   });
+  
+  // Watch for client_id changes to fetch tasks
+  const selectedClientId = hoursForm.watch("client_id");
+  
+  useEffect(() => {
+    if (selectedClientId) {
+      setLoadingTasks(true);
+      setTasks([]);
+      axios
+        .get(`${API_URL}/tasks/get_tasks_by_client`, {
+          params: { client_id: selectedClientId },
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+          },
+        })
+        .then((res) => {
+          setTasks(res.data || []);
+        })
+        .catch((err) => {
+          setTasks([]);
+          showNotification("Error", "No se pudieron cargar las tareas del cliente", "error");
+        })
+        .finally(() => setLoadingTasks(false));
+    } else {
+      setTasks([]);
+    }
+  }, [selectedClientId, API_URL, token, showNotification]);
 
   // Helper function to download file from response
   const downloadFile = (response: AxiosResponse<Blob>, defaultFileName: string) => {
@@ -94,28 +128,41 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
       showNotification('Error', 'No autorizado. Por favor inicie sesión', 'error');
       return;
     }
-    
+    if (!data.task_id) {
+      showNotification('Error', 'Debe seleccionar una tarea', 'error');
+      return;
+    }
+  
     setLoading(true);
     try {
       // Include auth token in the request from useAuthStore
       const authHeaders = getAuthHeaders();
-      
+  
+      // Only send required fields
+      const payload = {
+        client_id: data.client_id,
+        task_id: data.task_id,
+        currency: data.currency,
+        exchange_rate: data.exchange_rate,
+        include_tax: data.include_tax,
+      };
+  
       // Modify to handle file download - set responseType to blob
-      const response = await axios.post<Blob>(`${API_URL}/reports/invoices/by-hours`, data, {
+      const response = await axios.post<Blob>(`${API_URL}/reports/invoices/by-hours`, payload, {
         ...authHeaders,
         responseType: 'blob'
       });
-      
+  
       // Get client name for the filename
       const client = clients.find(c => c.id === data.client_id);
       const clientName = client ? client.name.replace(/\s+/g, '_') : 'cliente';
-      
+  
       // Download the file
       downloadFile(response, `factura_horas_${clientName}.pdf`);
-      
+  
       showNotification('Éxito', 'Factura por horas generada y descargada correctamente', 'success');
       hoursForm.reset();
-      
+  
       // Call the onSuccess callback if provided
       if (onSuccess) {
         onSuccess();
@@ -123,11 +170,11 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
     } catch (error) {
       console.error('Error creating invoice:', error);
       let errorMessage = 'Error al crear la factura por horas';
-      
+  
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         errorMessage = 'No autorizado. Verifique su sesión e intente nuevamente.';
       }
-      
+  
       showNotification('Error', errorMessage, 'error');
     } finally {
       setLoading(false);
@@ -156,7 +203,7 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
                 <select
                   id="hours-client"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                  {...hoursForm.register("client_id", { 
+                  {...hoursForm.register("client_id", {
                     required: true,
                     valueAsNumber: true
                   })}
@@ -181,6 +228,43 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
               </>
             )}
           </div>
+          
+          {/* Task Selection (only show after client is selected) */}
+          {selectedClientId && (
+            <div className="space-y-2">
+              <label htmlFor="hours-task" className="block text-sm font-medium text-black">
+                Tarea
+              </label>
+              {loadingTasks ? (
+                <div className="text-black">Cargando tareas...</div>
+              ) : (
+                <>
+                  <select
+                    id="hours-task"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+                    {...hoursForm.register("task_id", { required: true, valueAsNumber: true })}
+                  >
+                    <option value="">Selecciona una tarea</option>
+                    {tasks.length > 0 ? (
+                      tasks.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>No hay tareas disponibles</option>
+                    )}
+                  </select>
+                  {tasks.length === 0 && (
+                    <p className="text-yellow-600 text-xs mt-1">No hay tareas disponibles</p>
+                  )}
+                  {hoursForm.formState.errors.task_id && (
+                    <p className="text-red-500 text-xs mt-1">Este campo es requerido</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Include Tax Toggle */}
           <div className="space-y-2">

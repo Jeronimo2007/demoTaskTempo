@@ -3,10 +3,15 @@ export interface Task {
   id: number;
   title: string;
   status: string;
-  due_date?: string;
+  due_date?: string; // Optional in TaskUpdate
+  client_id: number; // Required in TaskCreate
+  client_name?: string; // Optional display field
+  billing_type?: 'hourly' | 'percentage'; // Optional in TaskUpdate, required in TaskCreate
+  area?: string | null; // Optional
+  note?: string | null; // Optional
+  total_value?: number | null; // Optional
+  // Keep potentially redundant fields for now to avoid breaking changes elsewhere.
   client?: string;
-  client_id?: number | null;
-  client_name?: string;
   name: string;
 }
 

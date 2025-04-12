@@ -1,19 +1,22 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuthStore } from '@/store/useAuthStore'; // Import the Zustand store
 
-// Define types for user and context
+// Define types for user and context (Keep the User type consistent or import if defined elsewhere)
+// Ensure this User type matches the one expected by components consuming the context
+// and the one stored in useAuthStore.
 type User = {
-  id: string;
-  name: string;
-  role: string; // Add role field
-  // Add other fields as needed
+  id: string | undefined; // Match the store's User type
+  username: string;      // Match the store's User type
+  role: string;
 };
 
 type AuthContextType = {
-  user: User | null; // User object now includes role
+  user: User | null;
   isAuthenticated: boolean;
-  login: (userData: User) => void; // userData should include role
+  loading: boolean; // Add loading state
+  login: (userData: User, token: string) => void; // Match store's setUser signature
   logout: () => void;
 };
 
@@ -22,37 +25,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Context provider
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Try to recover user from localStorage on initialization
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    }
-    return null;
-  });
+  // Get state and actions from Zustand store
+  const { user, token, setUser, logout: storeLogout } = useAuthStore();
+  const [loading, setLoading] = useState(true); // Initialize loading state
 
-  const isAuthenticated = !!user;
+  // Determine authentication status based on the token from the store
+  const isAuthenticated = !!token;
 
-  // Update localStorage when user changes
+  // Simulate loading completion after initial mount
+  // This allows Zustand to potentially hydrate from localStorage before we check auth
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('user');
-    }
-  }, [user]);
+    // Check if Zustand has hydrated (simple check based on token presence)
+    // A more robust solution might involve Zustand persistence middleware state
+    setLoading(false);
+  }, []); // Runs once after mount
 
-  const login = (userData: User) => {
-    setUser(userData);
+  // Context's login function now calls the store's setUser
+  const login = (userData: User, token: string) => {
+    setUser(userData, token);
   };
 
+  // Context's logout function now calls the store's logout
   const logout = () => {
-    setUser(null);
+    storeLogout();
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
-      {children}
+    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout }}>
+      {/* Render children only when not loading */}
+      {!loading ? children : null /* Or render a global loading spinner */}
     </AuthContext.Provider>
   );
 };
