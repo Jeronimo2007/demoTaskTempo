@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from "../../components/Sidebar";
 import { useAuthStore } from '@/store/useAuthStore';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'; // Added useSearchParams
 import TimerSidebar from '@/components/TimerSidebar';
 import taskService from '@/services/taskService';
 import timeEntryService from '@/services/timeEntryService';
@@ -23,7 +23,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, setUser } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams(); // Added searchParams hook
+  console.log("Layout Render - Search Params:", searchParams.toString()); // Log params on render
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [googleParamsProcessed, setGoogleParamsProcessed] = useState(false); // Track if params were handled
   const [isLoading, setIsLoading] = useState(true);
   
   // Reference to track if timer is active to prevent unnecessary updates
@@ -141,31 +144,88 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     fetchTasks(true);
   }, [pathname, fetchTasks]);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      // Try to recover session from localStorage
+// Effect specifically for handling Google Auth redirect parameters ONCE
+useEffect(() => {
+  const googleAccessToken = searchParams.get("access_token");
+  const googleUserId = searchParams.get("user_id");
+  const googleUsername = searchParams.get("username");
+  const googleRole = searchParams.get("role");
+
+  // Process only if params exist AND haven't been processed yet in this session
+  if (!googleParamsProcessed && googleAccessToken && googleUserId && googleUsername && googleRole) {
+    console.log("Google Param Handler Effect - Params found:", { googleAccessToken, googleUserId, googleUsername, googleRole });
+    try {
+      // Set user state
+      setUser({ id: googleUserId, username: googleUsername, role: googleRole }, googleAccessToken);
+      console.log("Google Param Handler Effect - setUser called. Marking as processed.");
+      setGoogleParamsProcessed(true); // Mark as processed to prevent re-running logic
+
+      // Clean the URL parameters
+      console.log("Google Param Handler Effect - Calling router.replace('/lawspace')...");
+      router.replace('/lawspace', undefined); // Clean URL - added undefined scroll option
+
+      // No return needed here as this effect should only run when params change
+    } catch (error) {
+      console.error("Google Param Handler Effect - Error processing Google Auth params:", error);
+      router.push('/login?error=google_auth_failed');
+    }
+  } else if (!googleParamsProcessed && (googleAccessToken || googleUserId || googleUsername || googleRole)) {
+      // Handle incomplete params (optional, could be done in main effect)
+      console.warn("Google Param Handler Effect - Incomplete Google Auth params detected. Redirecting to login.");
+      // Avoid immediate redirect if user might exist from storage
       if (!user) {
-        const storedUser = localStorage.getItem('user');
-        const storedToken = localStorage.getItem('token');
-        
-        if (storedUser && storedToken) {
-          try {
-            setUser(JSON.parse(storedUser), storedToken);
-            return;
-          } catch (error) {
-            console.error('Error recovering session:', error);
-          }
-        }
-        router.push('/login');
-        return;
+          router.push('/login?error=google_incomplete_params');
       }
+  } // Removed the 'else' part, let the main effect handle non-Google cases
+  // Run ONLY when searchParams changes OR user state changes (to handle incomplete param redirect logic)
+}, [searchParams, setUser, router, user, googleParamsProcessed]); // Added googleParamsProcessed dependency
 
-      // Fetch tasks for the timer when user is available
-      fetchTasks(true);
-    };
 
-    checkAuth();
-  }, [user, router, setUser, fetchTasks]);
+// Effect for general Auth Check and Task Fetching
+useEffect(() => {
+  const checkAuthAndFetch = async () => {
+    console.log("Main Auth Effect - Running. Current user:", user);
+
+    // If user is already set (either by Google handler or localStorage), fetch tasks
+    if (user) {
+      console.log("Main Auth Effect - User exists. Fetching tasks.");
+      fetchTasks(true); // Fetch tasks if user exists
+      return; // Already authenticated, tasks fetched (or will be)
+    }
+
+    // --- Try to recover session from localStorage (only if user is not set) ---
+    console.log("Main Auth Effect - User state is null. Checking localStorage...");
+    const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem('token');
+
+    if (storedUser && storedToken) {
+      try {
+        console.log("Main Auth Effect - Recovering session from localStorage.");
+        setUser(JSON.parse(storedUser), storedToken);
+        // Note: fetchTasks will be called in the *next* run of this effect because 'user' dependency changed
+        return; // Session recovered, exit check for this run
+      } catch (error) {
+        console.error('Main Auth Effect - Error recovering session:', error);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    }
+
+    // --- Redirect to login if no user and no recovery ---
+    // Check if Google params are currently present - if so, wait for the other effect
+    const googleAccessToken = searchParams.get("access_token"); // Check again here
+    if (googleAccessToken) { // Just check one param as an indicator
+        console.log("Main Auth Effect - Google params detected, deferring login redirect.");
+        return; // Give the other effect time to process
+    }
+
+    console.log("Main Auth Effect - No user, no recovery, no Google params. Redirecting to /login.");
+    router.push('/login');
+  };
+
+  checkAuthAndFetch();
+  // Dependencies: user state, router, setUser, fetchTasks. Crucially, NOT searchParams here.
+}, [user, router, setUser, fetchTasks]); // Removed searchParams
 
   // Refresh tasks periodically or when user changes
   useEffect(() => {

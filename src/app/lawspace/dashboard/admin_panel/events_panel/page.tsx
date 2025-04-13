@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Table, Modal, Form, DatePicker, Select, Input, Space, Popconfirm, message } from 'antd';
+import { Button, Table, Modal, Form, DatePicker, TimePicker, Select, Input, Space, Popconfirm, message } from 'antd';
 import { FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaUsers } from 'react-icons/fa';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -23,13 +23,19 @@ interface User {
 interface Event {
   id: number;
   title: string;
+  description?: string | null;
   event_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
   user_ids: number[];
 }
 
 interface EventFormData {
   title: string;
+  description?: string | null;
   event_date: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
   user_ids: number[];
 }
 
@@ -86,7 +92,7 @@ const EventsPanel = () => {
         logout(); // Logout on auth error
       }
     } finally {
-      // setLoading(false); // Loading state managed by useEffect
+      setLoading(false); // Always reset loading state
     }
   }, [getAuthHeadersConfig, logout]); // Added logout dependency
 
@@ -145,7 +151,10 @@ const EventsPanel = () => {
 
     const eventData = {
       title: values.title,
+      description: values.description,
       event_date: formattedDate,
+      start_time: values.start_time ? dayjs(values.start_time).format('HH:mm') : null,
+      end_time: values.end_time ? dayjs(values.end_time).format('HH:mm') : null,
       user_ids: values.user_ids
     };
 
@@ -184,7 +193,10 @@ const EventsPanel = () => {
 
     const eventData = {
       title: values.title,
+      description: values.description,
       event_date: formattedDate,
+      start_time: values.start_time ? dayjs(values.start_time).format('HH:mm') : null,
+      end_time: values.end_time ? dayjs(values.end_time).format('HH:mm') : null,
       user_ids: values.user_ids
     };
 
@@ -225,7 +237,10 @@ const EventsPanel = () => {
     setEditingEvent(event);
     form.setFieldsValue({
       title: event.title,
-      event_date: dayjs(event.event_date), // Use dayjs for DatePicker
+      description: event.description || "",
+      event_date: dayjs(event.event_date),
+      start_time: event.start_time ? dayjs(event.start_time, "HH:mm") : null,
+      end_time: event.end_time ? dayjs(event.end_time, "HH:mm") : null,
       user_ids: event.user_ids,
     });
     setEditModalVisible(true);
@@ -254,6 +269,13 @@ const EventsPanel = () => {
       className: 'text-black',
     },
     {
+      title: 'Descripción',
+      dataIndex: 'description',
+      key: 'description',
+      className: 'text-black',
+      render: (desc: string) => desc || <span className="text-gray-400">Sin descripción</span>,
+    },
+    {
       title: 'Fecha de Evento',
       dataIndex: 'event_date',
       key: 'event_date',
@@ -264,6 +286,20 @@ const EventsPanel = () => {
           {dayjs(date).format('DD/MM/YYYY')}
         </div>
       ),
+    },
+    {
+      title: 'Hora de Inicio',
+      dataIndex: 'start_time',
+      key: 'start_time',
+      className: 'text-black',
+      render: (time: string) => time ? dayjs(time, "HH:mm").format("HH:mm") : <span className="text-gray-400">-</span>,
+    },
+    {
+      title: 'Hora de Fin',
+      dataIndex: 'end_time',
+      key: 'end_time',
+      className: 'text-black',
+      render: (time: string) => time ? dayjs(time, "HH:mm").format("HH:mm") : <span className="text-gray-400">-</span>,
     },
     {
       title: 'Usuarios Asignados',
@@ -369,6 +405,14 @@ const EventsPanel = () => {
               </Form.Item>
 
               <Form.Item
+                name="description"
+                label={<span className="text-black">Descripción</span>}
+                rules={[]}
+              >
+                <Input.TextArea placeholder="Descripción del evento" className="text-black" />
+              </Form.Item>
+
+              <Form.Item
                 name="event_date"
                 label={
                   <div className="flex items-center text-black">
@@ -384,43 +428,65 @@ const EventsPanel = () => {
                   className="text-black"
                 />
               </Form.Item>
+<Form.Item
+  name="start_time"
+  label={<span className="text-black">Hora de Inicio</span>}
+  rules={[{ required: true, message: 'Por favor seleccione la hora de inicio' }]}
+>
+  <TimePicker
+    format="HH:mm"
+    style={{ width: '100%' }}
+    className="text-black"
+  />
+</Form.Item>
 
-              <Form.Item
-                name="user_ids"
-                label={
-                  <div className="flex items-center text-black">
-                    <FaUsers className="mr-2 text-green-500" />
-                    <span>Usuarios Asignados</span>
-                  </div>
-                }
-                rules={[{ required: true, message: 'Por favor seleccione al menos un usuario' }]}
-              >
-                <Select
-                  mode="multiple"
-                  placeholder="Seleccione usuarios"
-                  style={{ width: '100%' }}
-                  className="text-black"
-                >
-                  {users.map(user => (
-                    <Select.Option key={user.id} value={user.id}>
-                      {user.username}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
+<Form.Item
+  name="end_time"
+  label={<span className="text-black">Hora de Fin</span>}
+  rules={[{ required: true, message: 'Por favor seleccione la hora de fin' }]}
+>
+  <TimePicker
+    format="HH:mm"
+    style={{ width: '100%' }}
+    className="text-black"
+  />
+</Form.Item>
 
-              <Form.Item>
-                <div className="flex justify-end">
-                  <Button onClick={() => setCreateModalVisible(false)} style={{ marginRight: 8 }}>
-                    Cancelar
-                  </Button>
-                  <Button type="primary" htmlType="submit" className="flex items-center">
-                    <FaPlus className="mr-1" /> Crear
-                  </Button>
-                </div>
-              </Form.Item>
-            </Form>
-          </Modal>
+<Form.Item
+  name="user_ids"
+  label={
+    <div className="flex items-center text-black">
+      <FaUsers className="mr-2 text-green-500" />
+      <span>Usuarios Asignados</span>
+    </div>
+  }
+  rules={[{ required: true, message: 'Por favor seleccione al menos un usuario' }]}
+>
+  <Select
+    mode="multiple"
+    placeholder="Seleccione usuarios"
+    style={{ width: '100%' }}
+    className="text-black"
+  >
+    {users.map(user => (
+      <Select.Option key={user.id} value={user.id}>
+        {user.username}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+<Form.Item>
+  <div className="flex justify-end">
+    <Button onClick={() => setCreateModalVisible(false)} style={{ marginRight: 8 }}>
+      Cancelar
+    </Button>
+    <Button type="primary" htmlType="submit" className="flex items-center">
+      <FaPlus className="mr-1" /> Crear
+    </Button>
+  </div>
+</Form.Item>
+</Form>
+</Modal>
 
           {/* Edit Event Modal */}
           <Modal
@@ -449,6 +515,14 @@ const EventsPanel = () => {
               </Form.Item>
 
               <Form.Item
+                name="description"
+                label={<span className="text-black">Descripción</span>}
+                rules={[]}
+              >
+                <Input.TextArea placeholder="Descripción del evento" className="text-black" />
+              </Form.Item>
+
+              <Form.Item
                 name="event_date"
                 label={
                   <div className="flex items-center text-black">
@@ -462,8 +536,33 @@ const EventsPanel = () => {
                   style={{ width: '100%' }}
                   format="YYYY-MM-DD"
                   className="text-black"
-                  // Ensure initial value is set correctly if editing
                   defaultValue={editingEvent ? dayjs(editingEvent.event_date) : undefined}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="start_time"
+                label={<span className="text-black">Hora de Inicio</span>}
+                rules={[{ required: true, message: 'Por favor seleccione la hora de inicio' }]}
+              >
+                <DatePicker.TimePicker
+                  format="HH:mm"
+                  style={{ width: '100%' }}
+                  className="text-black"
+                  defaultValue={editingEvent && editingEvent.start_time ? dayjs(editingEvent.start_time, "HH:mm") : undefined}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="end_time"
+                label={<span className="text-black">Hora de Fin</span>}
+                rules={[{ required: true, message: 'Por favor seleccione la hora de fin' }]}
+              >
+                <DatePicker.TimePicker
+                  format="HH:mm"
+                  style={{ width: '100%' }}
+                  className="text-black"
+                  defaultValue={editingEvent && editingEvent.end_time ? dayjs(editingEvent.end_time, "HH:mm") : undefined}
                 />
               </Form.Item>
 

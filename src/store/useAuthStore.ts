@@ -13,21 +13,25 @@ type AuthState = {
   logout: () => void;
 };
 
+// Initial state read from localStorage, checking if window is defined for SSR compatibility
+const initialUserString = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+const initialToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+const initialUser = initialUserString ? JSON.parse(initialUserString) : null;
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
+  user: initialUser,
+  token: initialToken,
   setUser: (user, token) => {
     // Clear existing data first
     localStorage.removeItem('user');
     localStorage.removeItem('token');
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    // Removed cookie clearing: document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     
     // Store new user and token in localStorage
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
     
-    // Set cookie with new token
-    document.cookie = `token=${token}; path=/`;
+    // Removed cookie setting: document.cookie = `token=${token}; path=/`;
     
     // Update store state
     set({ user, token });
@@ -37,8 +41,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     
-    // Clear cookie
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    // Removed cookie clearing: document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     
     // Clear store state
     set({ user: null, token: null });

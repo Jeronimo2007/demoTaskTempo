@@ -15,27 +15,7 @@ export default function LoginPage() {
 
 
 
- 
-  useEffect(() => {
-    
-    const params = new URLSearchParams(window.location.search);
-    const googleAccessToken = params.get("access_token");
-
-    if (googleAccessToken) {
-      localStorage.setItem("access_token", googleAccessToken);
-      const user_id = params.get("user_id");
-    
-      // Fetch username and email directly from params for clarity
-      setUser({ id: user_id ?? '', username: params.get("username") ?? '', role: "google" }, googleAccessToken);
-    
-      // Limpiar la URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    
-      router.push("/lawspace");
-    }
-    
-    // Removed 'user' from dependency array as it's not used in the effect
-  }, [router]);
+ // Removed useEffect that handled Google Auth params, moved to layout.tsx
 
   const handleLogin = async () => {
     try {
