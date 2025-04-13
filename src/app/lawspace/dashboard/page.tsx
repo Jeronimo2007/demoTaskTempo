@@ -10,7 +10,6 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { addDays, subYears } from "date-fns";
-import ContractsTable from "@/components/contracts/ContractsTable";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
@@ -43,19 +42,6 @@ type ClientSummaryData = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export interface Contract {
-  id: number;
-  client_id: number;
-  description: string | null;
-  total_value: number;
-  start_date: string;
-  end_date: string | null;
-  active: boolean;
-  total_pagado: number;
-  porcentaje_pagado: number;
-  created_at: string;
-}
-
 export default function Dashboard() {
   // const { user } = useAuthStore(); // Remove useAuthStore usage
   const { user, isAuthenticated, logout } = useAuth(); // Use useAuth hook
@@ -63,7 +49,6 @@ export default function Dashboard() {
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummaryData[]>([]);
-    const [contracts, setContracts] = useState<Contract[]>([]);
     const [clientNames, setClientNames] = useState<{ id: number; name: string }[]>([]);
   const [startDate, setStartDate] = useState(subYears(new Date(), 1));
   const [endDate, setEndDate] = useState(addDays(new Date(), 1));
@@ -74,12 +59,10 @@ export default function Dashboard() {
 
   // Add search states
   const [permanentSearch, setPermanentSearch] = useState("");
-  const [contractsSearch, setContractsSearch] = useState("");
   const [tasksSearch, setTasksSearch] = useState("");
 
   // Add pagination states
   const [currentPermanentPage, setCurrentPermanentPage] = useState(1);
-  const [currentContractsPage, setCurrentContractsPage] = useState(1);
   const [currentTasksPage, setCurrentTasksPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -229,18 +212,6 @@ export default function Dashboard() {
     );
   });
 
-  const filteredContracts = contracts.filter(contract => {
-    const searchLower = contractsSearch.toLowerCase();
-    const clientName = clientNames.find(c => c.id === contract.client_id)?.name || "";
-    return (
-      clientName.toLowerCase().includes(searchLower) ||
-      contract.description?.toLowerCase().includes(searchLower) ||
-      formatCurrency(contract.total_value).toLowerCase().includes(searchLower) ||
-      contract.start_date.includes(searchLower) ||
-      (contract.end_date && contract.end_date.includes(searchLower))
-    );
-  });
-
   const searchedTasks = filteredTasks.filter(task => {
     const searchLower = tasksSearch.toLowerCase();
     return (
@@ -253,17 +224,11 @@ export default function Dashboard() {
 
   // Calculate pagination for each table
   const totalPermanentPages = Math.ceil(filteredClientSummary.length / itemsPerPage);
-  const totalContractsPages = Math.ceil(filteredContracts.length / itemsPerPage);
   const totalTasksPages = Math.ceil(searchedTasks.length / itemsPerPage);
 
   const paginatedClientSummary = filteredClientSummary.slice(
     (currentPermanentPage - 1) * itemsPerPage,
     currentPermanentPage * itemsPerPage
-  );
-
-  const paginatedContracts = filteredContracts.slice(
-    (currentContractsPage - 1) * itemsPerPage,
-    currentContractsPage * itemsPerPage
   );
 
   const paginatedTasks = searchedTasks.slice(
@@ -280,10 +245,6 @@ export default function Dashboard() {
     setCurrentPermanentPage(1);
   }, [permanentSearch]);
 
-  useEffect(() => {
-    setCurrentContractsPage(1);
-  }, [contractsSearch]);
-
   // Simplified initialization effect relying on ProtectedRoute
   useEffect(() => {
     const fetchData = async () => {
@@ -294,7 +255,6 @@ export default function Dashboard() {
           fetchReportData(),
           fetchTasks(),
           fetchClientSummary(),
-          // fetchContracts() // Consider if this needs to be here or fetched separately
         ]);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -313,35 +273,6 @@ export default function Dashboard() {
       fetchData();
     }
   }, [isAuthenticated, user, fetchReportData, fetchTasks, fetchClientSummary, logout, router]); // Removed verifyToken, added isAuthenticated, user, logout
-
-    useEffect(() => {
-      const fetchContracts = async () => {
-        try {
-          const token = getToken();
-          if (!token) {
-            console.error("No se encontró el token de autenticación.");
-            return;
-          }
-
-          const contractsResponse = await axios.get(`${API_URL}/contracts/contracts`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setContracts(contractsResponse.data);
-
-          const clientNamesResponse = await axios.get(`${API_URL}/clients/get_clients_name`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setClientNames(clientNamesResponse.data);
-        } catch (error) {
-          console.error("Error al obtener los contratos:", error);
-        }
-      };
-
-      // Fetch contracts only if authenticated (optional, depends if needed before main data)
-      if (isAuthenticated) {
-          fetchContracts();
-      }
-    }, [getToken, isAuthenticated]); // Added isAuthenticated dependency
 
   // Loading state handled within ProtectedRoute wrapper
 
@@ -459,45 +390,6 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-semibold">Contratos</h3>
-              <div className="relative w-64">
-                <input
-                  type="text"
-                  placeholder="Buscar por cliente, descripción o valor..."
-                  value={contractsSearch}
-                  onChange={(e) => setContractsSearch(e.target.value)}
-                  className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <div className="absolute left-3 top-2.5 text-gray-400">
-                  <FontAwesomeIcon icon={faSearch} />
-                </div>
-              </div>
-            </div>
-            <ContractsTable contracts={paginatedContracts} clientNames={clientNames} />
-            {/* Pagination for Contracts */}
-            <div className="flex justify-between items-center mt-4">
-              <button
-                onClick={() => setCurrentContractsPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentContractsPage === 1}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <span className="text-gray-700">
-                Página {currentContractsPage} de {totalContractsPages}
-              </span>
-              <button
-                onClick={() => setCurrentContractsPage(prev => Math.min(prev + 1, totalContractsPages))}
-                disabled={currentContractsPage === totalContractsPages}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-
           {/* Tasks Section */}
           <div className="bg-white p-4 rounded-lg shadow-lg mt-6 text-black">
             <div className="flex justify-between items-center mb-3">

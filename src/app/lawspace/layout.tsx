@@ -8,6 +8,7 @@ import TimerSidebar from '@/components/TimerSidebar';
 import taskService from '@/services/taskService';
 import timeEntryService from '@/services/timeEntryService';
 import { Task } from '@/types/task';
+import { User } from '@/store/useAuthStore'; // Import User type if not already implicitly available
 import EventNotifications from '@/components/EventNotifications';
 
 interface TimeEntry {
@@ -38,8 +39,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   // Function to fetch tasks for the timer
-  const fetchTasks = useCallback(async (forceUpdate = false) => {
+  // Modified to accept currentUser argument
+  const fetchTasks = useCallback(async (forceUpdate = false, currentUser: User | null) => {
     try {
+       console.log("fetchTasks - Received currentUser:", currentUser); // Log received user
       // Skip update if timer is active and this is not a forced update
       if (timerActiveRef.current && !forceUpdate) {
         return;
@@ -51,7 +54,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .find((row) => row.startsWith("token="))
         ?.split("=")[1] || "";
       
-      if (!token || !user) {
+      // Use currentUser argument for check
+      if (!token || !currentUser) {
         return;
       }
 
@@ -72,7 +76,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const allTasksData = await taskService.getAllTasks(startDate, endDate);
       
       // For users with elevated permissions (senior, socio), show all tasks
-      if (user.role && ['senior', 'socio'].includes(user.role.toLowerCase())) {
+      const userRole = currentUser?.role?.toLowerCase(); // Safely access role and lowercase it
+      const isElevated = userRole && ['senior', 'socio'].includes(userRole);
+      console.log(`fetchTasks - Role check: Role='${userRole}', IsElevated=${isElevated}`); // Log role and check result
+      // Use currentUser argument for role check
+      if (isElevated) {
+        console.log("fetchTasks - Executing elevated permissions branch (socio/senior)"); // Log branch
         setTasks(prevTasks => {
           // Only update if there are actual changes
           if (JSON.stringify(prevTasks) !== JSON.stringify(allTasksData)) {
@@ -83,8 +92,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       } 
       // For regular users, only show assigned tasks
       else {
-        const userId = user.id;
-        const assignedTasks = await taskService.getAssignedTasks(userId);
+        console.log("fetchTasks - Executing regular user branch"); // Log branch
+        // Use currentUser argument for ID
+        const userId = currentUser.id;
+        const assignedTasks = userId ? await taskService.getAssignedTasks(userId) : []; // Handle potential undefined ID
         
         if (assignedTasks && assignedTasks.length > 0) {
           // Extract the task IDs that are assigned to this user
@@ -109,7 +120,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []); // Removed 'user' dependency as it's now passed as an argument
 
   // Handle time entry creation
   const handleTimeEntryCreate = async (entry: TimeEntry): Promise<void> => {
@@ -141,7 +152,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     
     // Force update tasks after saving an entry
-    fetchTasks(true);
+    // Pass the current user from the component scope here
+    fetchTasks(true, user);
   }, [pathname, fetchTasks]);
 
 // Effect specifically for handling Google Auth redirect parameters ONCE
@@ -155,8 +167,11 @@ useEffect(() => {
   if (!googleParamsProcessed && googleAccessToken && googleUserId && googleUsername && googleRole) {
     console.log("Google Param Handler Effect - Params found:", { googleAccessToken, googleUserId, googleUsername, googleRole });
     try {
+      const userToSet = { id: googleUserId, username: googleUsername, role: googleRole };
++      console.log("Google Param Handler Effect - User object BEFORE setUser:", userToSet); // Log user object
       // Set user state
-      setUser({ id: googleUserId, username: googleUsername, role: googleRole }, googleAccessToken);
++      setUser(userToSet, googleAccessToken);
+      console.log("Google Param Handler Effect - Store state AFTER setUser:", useAuthStore.getState().user); // Log state directly from store
       console.log("Google Param Handler Effect - setUser called. Marking as processed.");
       setGoogleParamsProcessed(true); // Mark as processed to prevent re-running logic
 
@@ -184,12 +199,15 @@ useEffect(() => {
 // Effect for general Auth Check and Task Fetching
 useEffect(() => {
   const checkAuthAndFetch = async () => {
-    console.log("Main Auth Effect - Running. Current user:", user);
+    // Get the LATEST user state directly from the store inside the effect
+    const currentUser = useAuthStore.getState().user;
+    console.log("Main Auth Effect - Running. User from store state:", currentUser);
 
     // If user is already set (either by Google handler or localStorage), fetch tasks
-    if (user) {
-      console.log("Main Auth Effect - User exists. Fetching tasks.");
-      fetchTasks(true); // Fetch tasks if user exists
+    // Use the freshly retrieved currentUser for checks
+    if (currentUser) {
+      console.log("Main Auth Effect - User exists. Fetching tasks. User Role:", currentUser.role);
+      fetchTasks(true, currentUser); // Pass currentUser
       return; // Already authenticated, tasks fetched (or will be)
     }
 
@@ -201,7 +219,8 @@ useEffect(() => {
     if (storedUser && storedToken) {
       try {
         console.log("Main Auth Effect - Recovering session from localStorage.");
-        setUser(JSON.parse(storedUser), storedToken);
+        // Call setUser from the hook, but the logic continues based on currentUser
+        setUser(JSON.parse(storedUser), storedToken); // This triggers a re-render, but doesn't affect this run
         // Note: fetchTasks will be called in the *next* run of this effect because 'user' dependency changed
         return; // Session recovered, exit check for this run
       } catch (error) {
@@ -219,7 +238,7 @@ useEffect(() => {
         return; // Give the other effect time to process
     }
 
-    console.log("Main Auth Effect - No user, no recovery, no Google params. Redirecting to /login.");
+    console.log("Main Auth Effect - No currentUser, no recovery, no Google params. Redirecting to /login.");
     router.push('/login');
   };
 
@@ -230,16 +249,16 @@ useEffect(() => {
   // Refresh tasks periodically or when user changes
   useEffect(() => {
     if (user) {
-      fetchTasks(true);
+      fetchTasks(true, user); // Pass component-scoped user
       
       // Refresh tasks every 5 minutes, but only if timer is not active
       const intervalId = setInterval(() => {
-        fetchTasks(false); // Don't force update on intervals
+        fetchTasks(false, user); // Pass component-scoped user
       }, 5 * 60 * 1000);
       
       return () => clearInterval(intervalId);
     }
-  }, [user, fetchTasks]);
+  }, [user, fetchTasks]); // Keep user dependency here
 
   // Custom event listener for timer state updates
   useEffect(() => {
