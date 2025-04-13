@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import axios from 'axios';
+import taskService from '@/services/taskService';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -16,6 +17,11 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
   const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [activeTab, setActiveTab] = useState<'general' | 'client' | 'task'>('general');
+  const [taskTabClientId, setTaskTabClientId] = useState('');
+  const [taskTabAvailableTasks, setTaskTabAvailableTasks] = useState<{ id: number; title: string }[]>([]);
+  const [taskTabLoadingTasks, setTaskTabLoadingTasks] = useState(false);
 
   if (user?.role === 'consultor') {
     return null;
@@ -63,57 +69,208 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
     downloadReport('/reports/download_client_report', { client_id: parseInt(selectedClientId), start_date: formattedStartDate, end_date: formattedEndDate });
   };
 
+  // Fetch tasks for the selected client in Task Report tab
+  React.useEffect(() => {
+    if (activeTab === 'task' && taskTabClientId) {
+      setTaskTabLoadingTasks(true);
+      taskService.getTasksByClient(Number(taskTabClientId))
+        .then((tasks) => {
+          setTaskTabAvailableTasks(tasks);
+        })
+        .finally(() => setTaskTabLoadingTasks(false));
+    } else if (activeTab === 'task') {
+      setTaskTabAvailableTasks([]);
+      setSelectedTaskId('');
+    }
+  }, [activeTab, taskTabClientId]);
+
+  const handleDownloadTaskReport = () => {
+    if (!taskTabClientId) {
+      alert('Por favor selecciona un cliente');
+      return;
+    }
+    if (!selectedTaskId) {
+      alert('Por favor selecciona una tarea');
+      return;
+    }
+    if (!startDate || !endDate) {
+      alert('Por favor selecciona la fecha de inicio y fin');
+      return;
+    }
+    const formattedStartDate = startDate.toISOString();
+    const formattedEndDate = endDate.toISOString();
+    downloadReport('/reports/download_task_report', {
+      task_id: Number(selectedTaskId),
+      start_date: formattedStartDate,
+      end_date: formattedEndDate,
+    });
+  };
+
   return (
     <div className="p-4 bg-white shadow-lg rounded-lg mt-6">
       <h2 className="text-lg font-semibold mb-3">Descargar Reportes</h2>
-      <div className="mb-4">
-        <div className="flex space-x-4">
-          <DatePicker
-            selected={startDate}
-            onChange={(date: Date | null) => date && setStartDate(date)}
-            selectsStart
-            startDate={startDate}
-            endDate={endDate}
-            className="border p-2 rounded"
-          />
-          <DatePicker
-            selected={endDate}
-            onChange={(date: Date | null) => date && setEndDate(date)}
-            selectsEnd
-            startDate={startDate}
-            endDate={endDate}
-            minDate={startDate}
-            className="border p-2 rounded"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 mb-4">
-        <select
-          value={selectedClientId}
-          onChange={(e) => setSelectedClientId(e.target.value)}
-          className="border p-2 text-black rounded"
-        >
-          <option value="">Select Client</option>
-          {clients.map((client) => (
-            <option key={client.id} value={client.id}>
-              {client.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex space-x-4">
+      {/* Tabs */}
+      <div className="flex mb-6 space-x-2">
         <button
-          onClick={handleDownloadGeneralReport}
-          className="bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+          className={`px-4 py-2 rounded-t ${activeTab === 'general' ? 'bg-blue-800 text-white' : 'bg-gray-200 text-gray-700'}`}
+          onClick={() => setActiveTab('general')}
         >
-          Descargar Reporte General
+          General
         </button>
         <button
-          onClick={handleDownloadClientReport}
-          className="bg-green-800 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+          className={`px-4 py-2 rounded-t ${activeTab === 'client' ? 'bg-green-800 text-white' : 'bg-gray-200 text-gray-700'}`}
+          onClick={() => setActiveTab('client')}
         >
-          Descargar Reporte De Cliente
+          Cliente
         </button>
+        <button
+          className={`px-4 py-2 rounded-t ${activeTab === 'task' ? 'bg-purple-800 text-white' : 'bg-gray-200 text-gray-700'}`}
+          onClick={() => setActiveTab('task')}
+        >
+          Tarea
+        </button>
+      </div>
+      {/* Tab Content */}
+      <div className="bg-gray-50 p-4 rounded-b shadow-inner">
+        {activeTab === 'general' && (
+          <>
+            <div className="flex space-x-4 mb-4">
+              <DatePicker
+                selected={startDate}
+                onChange={(date: Date | null) => date && setStartDate(date)}
+                selectsStart
+                startDate={startDate}
+                endDate={endDate}
+                className="border p-2 rounded"
+              />
+              <DatePicker
+                selected={endDate}
+                onChange={(date: Date | null) => date && setEndDate(date)}
+                selectsEnd
+                startDate={startDate}
+                endDate={endDate}
+                minDate={startDate}
+                className="border p-2 rounded"
+              />
+            </div>
+            <button
+              onClick={handleDownloadGeneralReport}
+              className="bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+            >
+              Descargar Reporte General
+            </button>
+          </>
+        )}
+        {activeTab === 'client' && (
+          <>
+            <div className="flex flex-col space-y-4 mb-4">
+              <div className="flex space-x-4">
+                <DatePicker
+                  selected={startDate}
+                  onChange={(date: Date | null) => date && setStartDate(date)}
+                  selectsStart
+                  startDate={startDate}
+                  endDate={endDate}
+                  className="border p-2 rounded"
+                />
+                <DatePicker
+                  selected={endDate}
+                  onChange={(date: Date | null) => date && setEndDate(date)}
+                  selectsEnd
+                  startDate={startDate}
+                  endDate={endDate}
+                  minDate={startDate}
+                  className="border p-2 rounded"
+                />
+              </div>
+              <select
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                className="border p-2 text-black rounded"
+              >
+                <option value="">Select Client</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleDownloadClientReport}
+              className="bg-green-800 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+            >
+              Descargar Reporte De Cliente
+            </button>
+          </>
+        )}
+        {activeTab === 'task' && (
+          <>
+            <div className="flex flex-col space-y-4 mb-4">
+              <select
+                value={taskTabClientId}
+                onChange={e => {
+                  setTaskTabClientId(e.target.value);
+                  setSelectedTaskId('');
+                }}
+                className="border p-2 text-black rounded"
+              >
+                <option value="">Selecciona un cliente</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedTaskId}
+                onChange={e => setSelectedTaskId(e.target.value)}
+                className="border p-2 text-black rounded"
+                disabled={!taskTabClientId || taskTabLoadingTasks}
+              >
+                <option value="">
+                  {taskTabLoadingTasks
+                    ? 'Cargando tareas...'
+                    : !taskTabClientId
+                      ? 'Selecciona un cliente primero'
+                      : taskTabAvailableTasks.length === 0
+                        ? 'No hay tareas para este cliente'
+                        : 'Selecciona una tarea'}
+                </option>
+                {taskTabAvailableTasks.map(task => (
+                  <option key={task.id} value={task.id}>
+                    {task.title}
+                  </option>
+                ))}
+              </select>
+              <div className="flex space-x-4">
+                <DatePicker
+                  selected={startDate}
+                  onChange={(date: Date | null) => date && setStartDate(date)}
+                  selectsStart
+                  startDate={startDate}
+                  endDate={endDate}
+                  className="border p-2 rounded"
+                />
+                <DatePicker
+                  selected={endDate}
+                  onChange={(date: Date | null) => date && setEndDate(date)}
+                  selectsEnd
+                  startDate={startDate}
+                  endDate={endDate}
+                  minDate={startDate}
+                  className="border p-2 rounded"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleDownloadTaskReport}
+              className="bg-purple-800 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+            >
+              Descargar Reporte de Tarea
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

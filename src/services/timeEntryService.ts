@@ -23,7 +23,7 @@ export interface TimeEntryResponse {
     end_time: string;
     duration: number;
     description?: string;
-    facturado: boolean;
+    facturado: string;
 }
 
 

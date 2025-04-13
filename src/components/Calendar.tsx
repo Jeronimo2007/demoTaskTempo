@@ -122,8 +122,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       setLoadingEntries(true);
       const { start, end } = getWeekRange(date);
       
-      console.log(`🔄 Fetching time entries for week of ${moment(date).format('DD/MM/YYYY')}`);
-      console.log(`📅 Week range: ${moment(start).format('DD/MM/YYYY')} to ${moment(end).format('DD/MM/YYYY')}`);
       
       const entries = await timeEntryService.getTimeEntriesByDateRange(start, end);
       
@@ -131,12 +129,10 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       const taskIds = tasks.map(task => task.id);
       const filteredEntries = entries.filter(entry => taskIds.includes(entry.task_id));
       
-      console.log(`✅ Fetched ${entries.length} entries, filtered to ${filteredEntries.length} entries for current tasks`);
       
       setApiTimeEntries(filteredEntries);
       return filteredEntries;
     } catch (error) {
-      console.error('❌ Error fetching time entries for week:', error);
       throw error;
     } finally {
       setLoadingEntries(false);
@@ -215,7 +211,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       // Refresh the current week's entries after deletion
       fetchTimeEntriesForWeek(currentDate);
     } catch (error) {
-      console.error("Error deleting time entry:", error);
       throw error;
     }
   }, [currentDate, fetchTimeEntriesForWeek]);
@@ -238,14 +233,12 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         return;
     }
 
-    console.log(`🔄 Navigating to ${action}: ${moment(newDate).format('DD/MM/YYYY')}`);
     setCurrentDate(newDate);
 
     // Calculate the start and end dates for the new week
     const startDate = moment(newDate).startOf('week').toDate();
     const endDate = moment(newDate).endOf('week').toDate();
 
-    console.log(`📅 New week range: ${moment(startDate).format('DD/MM/YYYY')} to ${moment(endDate).format('DD/MM/YYYY')}`);
 
     // Call onRefresh with the new date range if provided
     if (onRefresh) {
@@ -253,7 +246,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       try {
         await onRefresh(startDate, endDate);
       } catch (error) {
-        console.error('Error refreshing data for new week:', error);
       } finally {
         setLoadingEntries(false);
       }
@@ -281,7 +273,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         // Refresh the current week's entries
         fetchTimeEntriesForWeek(currentDate);
       } catch (err) {
-        console.error('Error al crear time entry:', err);
         setError('Error al guardar la entrada de tiempo. Inténtalo de nuevo.');
       } finally {
         setCreating(false);
@@ -298,7 +289,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
 
   // Para depuración - mostrar el userColorMap en la consola
   useEffect(() => {
-    console.log('userColorMap:', userColorMap);
   }, [userColorMap]);
 
   // Convert time entries from API to calendar events
@@ -311,7 +301,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       const eventColor = userColorMap[userId] || '#cccccc';
       
       // Para depuración
-      console.log(`Entry ${entry.id} - User ${userId} - Color: ${eventColor}`);
       
       return {
         id: `api-${entry.id}`,
@@ -333,7 +322,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
     const isCurrentUserEntry = event.resource.userId === effectiveCurrentUserId;
     
     // Para depuración
-    console.log(`Rendering event ${event.id} with color ${event.color}`);
     
     return {
       className: '',
@@ -398,7 +386,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
           Por: {creator}
         </div>
         <div style={{ fontSize: '0.8em' }}>
-          Facturado: {entry.facturado ? 'Si' : 'No'}
+          Facturado: {entry.facturado}
         </div>
       </div>
     );
@@ -419,7 +407,6 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
     };
 
     const handleRefresh = async () => {
-      console.log('🔄 Calendar refresh button clicked');
       setLoadingEntries(true);
 
       try {
@@ -428,9 +415,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         const endDate = moment(currentDate).endOf('week').toDate();
         
         await onRefresh(startDate, endDate);
-        console.log('✅ Calendar refresh completed');
       } catch (err) {
-        console.error('❌ Error during calendar refresh:', err);
       } finally {
         setLoadingEntries(false);
       }

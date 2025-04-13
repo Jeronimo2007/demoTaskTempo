@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlay, FaPause, FaStop, FaSync, FaTimes, FaClock, FaPlus, FaTrash } from 'react-icons/fa';
 import { VscDebugRestart } from 'react-icons/vsc';
 import { Task } from '@/types/task';
+import clientService, { Client } from '@/services/clientService';
+import taskService from '@/services/taskService';
 
 type TimeEntry = {
   id?: number;
@@ -15,6 +17,8 @@ type TimeEntry = {
 // Individual timer state
 type Timer = {
   id: string;
+  clientId: number | null;
+  availableTasks: Task[];
   taskId: number | null;
   isRunning: boolean;
   isPaused: boolean;
@@ -32,16 +36,20 @@ interface TimerSidebarProps {
   className?: string;
 }
 
-const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, onEntryCreated, className }) => {
+const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryCreated, className }) => {
   // Sidebar state
   const [isOpen, setIsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
-  
+
   // Multiple timers state
   const [timers, setTimers] = useState<Timer[]>([]);
+
+  // Clients state
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState<boolean>(false);
   
   // References
   const timerRef = useRef<HTMLDivElement>(null);
@@ -87,39 +95,28 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
   }, [notifyTimerStateChange, errorTimeout, timerIntervalsRef]);
   
   // Use localStorage to save timers state between page refreshes
+  // Fetch clients on mount
+  useEffect(() => {
+    setClientsLoading(true);
+    clientService.getAllClients()
+      .then(setClients)
+      .finally(() => setClientsLoading(false));
+  }, []);
+
+  // Restore timers from localStorage (ignore task validation, just restore)
   useEffect(() => {
     const savedTimersState = localStorage.getItem('multiTimerState');
     if (savedTimersState) {
       try {
         const parsedState = JSON.parse(savedTimersState);
-        
         if (Array.isArray(parsedState)) {
-          // Process each timer to restore dates and validate task IDs
-          const restoredTimers = parsedState.map(timer => {
-            // Only include timers with valid task IDs
-            if (timer.taskId && tasks.some(task => task.id === timer.taskId)) {
-              const restoredTimer = {
-                ...timer,
-                startTime: timer.startTime ? new Date(timer.startTime) : null,
-              };
-              
-              // Restore time entry date objects
-              if (timer.currentTimeEntry && timer.currentTimeEntry.start_time) {
-                restoredTimer.currentTimeEntry = {
-                  ...timer.currentTimeEntry,
-                  start_time: new Date(timer.currentTimeEntry.start_time)
-                };
-              }
-              
-              return restoredTimer;
-            }
-            return null;
-          }).filter(Boolean) as Timer[];
-          
+          const restoredTimers = parsedState.map(timer => ({
+            ...timer,
+            startTime: timer.startTime ? new Date(timer.startTime) : null,
+            availableTasks: timer.availableTasks || [],
+          }));
           if (restoredTimers.length > 0) {
             setTimers(restoredTimers);
-            
-            // Setup intervals for running timers
             restoredTimers.forEach(timer => {
               if (timer.isRunning) {
                 setupTimerInterval(timer.id);
@@ -132,7 +129,7 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
         localStorage.removeItem('multiTimerState');
       }
     }
-  }, [tasks]);
+  }, []);
 
   // Save timers state to localStorage whenever it changes
   useEffect(() => {
@@ -140,13 +137,14 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
       const timersToSave = timers.map(timer => ({
         ...timer,
         startTime: timer.startTime ? timer.startTime.toISOString() : null,
+        availableTasks: timer.availableTasks || [],
         currentTimeEntry: timer.currentTimeEntry ? {
           ...timer.currentTimeEntry,
           start_time: timer.currentTimeEntry.start_time ? timer.currentTimeEntry.start_time.toISOString() : undefined,
           end_time: timer.currentTimeEntry.end_time ? timer.currentTimeEntry.end_time.toISOString() : undefined,
         } : null
       }));
-      
+
       localStorage.setItem('multiTimerState', JSON.stringify(timersToSave));
     } else if (localStorage.getItem('multiTimerState')) {
       // Clear saved state if no timers are active
@@ -201,6 +199,8 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
   const addNewTimer = () => {
     const newTimer: Timer = {
       id: `timer-${Date.now()}`,
+      clientId: null,
+      availableTasks: [],
       taskId: null,
       isRunning: false,
       isPaused: false,
@@ -210,7 +210,7 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
       description: '',
       currentTimeEntry: null
     };
-    
+
     setTimers([...timers, newTimer]);
     setActiveTimerId(newTimer.id);
   };
@@ -230,6 +230,27 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
     if (activeTimerId === timerId) {
       const remainingTimers = timers.filter(timer => timer.id !== timerId);
       setActiveTimerId(remainingTimers.length > 0 ? remainingTimers[0].id : null);
+    }
+  };
+
+  // Update timer client
+  const updateTimerClient = async (timerId: string, clientId: number | null) => {
+    setTimers(timers =>
+      timers.map(timer =>
+        timer.id === timerId
+          ? { ...timer, clientId, taskId: null, availableTasks: [] }
+          : timer
+      )
+    );
+    if (clientId) {
+      const tasks = await taskService.getTasksByClient(clientId);
+      setTimers(timers =>
+        timers.map(timer =>
+          timer.id === timerId
+            ? { ...timer, availableTasks: tasks }
+            : timer
+        )
+      );
     }
   };
 
@@ -263,22 +284,26 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
   const startTimer = (timerId: string) => {
     const timer = timers.find(t => t.id === timerId);
     if (!timer) return;
-    
+
+    if (timer.clientId === null) {
+      showError("Por favor primero selecciona un cliente");
+      return;
+    }
     if (timer.taskId === null) {
       showError("Por favor primero selecciona una tarea");
       return;
     }
-    
+
     try {
       const now = new Date();
-      
+
       // Create a new time entry
       const newEntry: TimeEntry = {
         taskId: timer.taskId,
         start_time: now,
         description: timer.description
       };
-      
+
       // Update the timer
       setTimers(timers.map(t => {
         if (t.id === timerId) {
@@ -294,10 +319,10 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
         }
         return t;
       }));
-      
+
       // Setup the interval
       setupTimerInterval(timerId);
-      
+
       setErrorMessage(null);
     } catch (err) {
       console.error('Error starting timer:', err);
@@ -374,7 +399,6 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
       const finalEntry: TimeEntry = {
         ...timer.currentTimeEntry,
         end_time: now,
-        duration: timer.elapsedTime,
         description: timer.description
       };
       
@@ -480,7 +504,7 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
     <>
       {/* Toggle button - only visible when sidebar is closed */}
       {!isOpen && (
-        <div 
+        <div
           className="fixed right-0 top-1/4 transform -translate-y-1/2 z-50 transition-opacity duration-300"
         >
           <button
@@ -539,24 +563,48 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ tasks, onTimeEntryCreate, o
                   </button>
                 </div>
 
+                {/* CLIENT SELECTION */}
                 <div className="mb-2">
-                  <label htmlFor={`task-select-${timer.id}`} className="block text-sm font-medium text-black">
-                    Tarea:
+                  <label htmlFor={`client-select-${timer.id}`} className="block text-sm font-medium text-black">
+                    Cliente:
                   </label>
                   <select
-                    id={`task-select-${timer.id}`}
+                    id={`client-select-${timer.id}`}
                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-black"
-                    value={timer.taskId === null ? '' : timer.taskId}
-                    onChange={(e) => updateTimerTask(timer.id, Number(e.target.value))}
+                    value={timer.clientId === null ? '' : timer.clientId}
+                    onChange={e => updateTimerClient(timer.id, e.target.value ? Number(e.target.value) : null)}
+                    disabled={clientsLoading}
                   >
-                    <option value="">Selecciona una tarea</option>
-                    {tasks.map((task) => (
-                      <option key={task.id} value={task.id}>
-                        {getClientName(task)} - {task.title}
+                    <option value="">Selecciona un cliente</option>
+                    {clients.map(client => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {/* TASK SELECTION */}
+                {timer.clientId && (
+                  <div className="mb-2">
+                    <label htmlFor={`task-select-${timer.id}`} className="block text-sm font-medium text-black">
+                      Tarea:
+                    </label>
+                    <select
+                      id={`task-select-${timer.id}`}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md text-black"
+                      value={timer.taskId === null ? '' : timer.taskId}
+                      onChange={e => updateTimerTask(timer.id, Number(e.target.value))}
+                    >
+                      <option value="">Selecciona una tarea</option>
+                      {timer.availableTasks.map(task => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="mb-2">
                   <label htmlFor={`description-${timer.id}`} className="block text-sm font-medium text-black">

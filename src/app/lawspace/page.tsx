@@ -537,8 +537,8 @@ const Workspace: React.FC = () => {
       )}
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-3 flex items-center">
-          Tareas {!hasElevatedPermissions() && "Asignadas"}
-          {hasElevatedPermissions() && selectedClient ? `del Cliente: ${selectedClient}` : hasElevatedPermissions() ? " (Todas)" : ""}
+          Asuntos {!hasElevatedPermissions() && "Asignadas"}
+          {hasElevatedPermissions() && selectedClient ? `del Cliente: ${selectedClient}` : hasElevatedPermissions() ? " (Todos)" : ""}
           {isLoading && (
             <span className="ml-3">
               <div className="h-4 w-4 border-t-2 border-blue-500 rounded-full animate-spin"></div>
@@ -561,7 +561,7 @@ const Workspace: React.FC = () => {
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="text-gray-500 p-4 text-center bg-gray-50 rounded-lg border border-gray-100">
-            No hay tareas disponibles. {!hasElevatedPermissions() && "Crea una tarea o contacta a un abogado senior o socio para que te asigne una."}
+            No hay asuntos disponibles. {!hasElevatedPermissions() && "Crea una tarea o contacta a un abogado senior o socio para que te asigne una."}
           </div>
         ) : (
           <div className="flex flex-col items-center">
@@ -578,7 +578,6 @@ const Workspace: React.FC = () => {
                       <h3 className="font-medium text-lg">{task.title}</h3>
                       <div className="mt-2 text-sm text-gray-600">
                         <p><span className="font-medium">Estado:</span> {task.status}</p>
-                        <p><span className="font-medium">Fecha de Vencimiento:</span> {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Sin fecha'}</p>
                         <p><span className="font-medium">Cliente:</span> {task.client_name || 'Cliente no asignado'}</p>
                       </div>
                     </div>
@@ -611,7 +610,7 @@ const Workspace: React.FC = () => {
       </div>
       <div>
         <h2 className="text-xl font-semibold mb-3 flex items-center">
-          Registros de Tiempo {!hasElevatedPermissions() && "de Tus Tareas Asignadas"}
+          Registros de Tiempo {!hasElevatedPermissions() && "de Tus Asuntos Asignadas"}
           {hasElevatedPermissions() && selectedClient ? `del Cliente: ${selectedClient}` : hasElevatedPermissions() ? " (Todos)" : ""}
           {(isLoadingEntries || isLoadingUsers) && (
             <span className="ml-3 flex items-center">

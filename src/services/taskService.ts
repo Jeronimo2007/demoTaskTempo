@@ -60,7 +60,6 @@ export const taskService = {
         url = `${url}?${queryString}`;
       }
 
-      console.log('Fetching tasks with URL:', url);
 
       const response = await axios.get<Task[]>( // Expecting array of updated Task objects
         url,
@@ -73,7 +72,6 @@ export const taskService = {
         name: task.title // Keep mapping title to name for compatibility? Review if 'name' is still needed.
       }));
     } catch (error) {
-      console.error('Error fetching all tasks:', error);
       return [];
     }
   },
@@ -99,7 +97,6 @@ export const taskService = {
 
       return response.data;
     } catch (error) {
-      console.error('Error fetching assigned tasks:', error);
       return [];
     }
   },
@@ -131,7 +128,6 @@ export const taskService = {
           client_id: Number(response.data.client_id) // Ensure client_id is number in returned object
       };
     } catch (error) {
-      console.error('Error creating task:', error);
       throw error;
     }
   },
@@ -170,7 +166,6 @@ export const taskService = {
           client_id: Number(response.data.client_id) // Ensure client_id is number in returned object
       };
     } catch (error) {
-      console.error('Error updating task:', error);
       throw error;
     }
   },
@@ -185,10 +180,38 @@ export const taskService = {
       );
       return response.data;
     } catch (error) {
-      console.error('Error deleting task:', error);
       throw error;
+    }
+  },
+
+  // Get tasks by client
+  getTasksByClient: async (clientId: number): Promise<Task[]> => {
+    const token = getToken();
+    try {
+      const response = await axios.post<Task[]>(
+        `${API_URL}/tasks/get_tasks_by_client`,
+        { client_id: clientId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    } catch (error) {
+      return [];
     }
   }
 };
 
 export default taskService;
+
+// --- PATCH: Update getTasksByClient to use GET with query param ---
+taskService.getTasksByClient = async (clientId: number): Promise<Task[]> => {
+  const token = getToken();
+  try {
+    const response = await axios.get<Task[]>(
+      `${API_URL}/tasks/get_tasks_by_client?client_id=${clientId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (error) {
+    return [];
+  }
+};

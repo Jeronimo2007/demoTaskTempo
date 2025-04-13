@@ -139,7 +139,7 @@ export default function AdminPanel() {
       console.log("Tasks fetched via service:", fetchedTasks); // Debug log
       setTasks(fetchedTasks);
     } catch (error) {
-      console.error("Error al obtener las tareas:", error);
+      console.error("Error al obtener los Asuntos:", error);
       setTasks([]); // Set to empty array on error
     }
   }, [getToken]);
@@ -407,7 +407,7 @@ export default function AdminPanel() {
           <ClientSection />
           <div className="p-6 text-black shadow-lg rounded-lg bg-white mt-10">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Gestión de Tareas</h2>
+              <h2 className="text-lg font-semibold">Gestión de Asuntos</h2>
               <div className="flex gap-4">
                 <select value={clientFilter} onChange={handleClientFilterChange} className="p-2 border rounded text-black">
                   <option value="">Todos los Clientes</option>
@@ -417,7 +417,7 @@ export default function AdminPanel() {
                   <FontAwesomeIcon icon={faRotate} className="mr-2" /> Actualizar
                 </button>
                 <button onClick={openTaskModal} className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-                  <FontAwesomeIcon icon={faPlus} className="mr-2" /> Nueva Tarea
+                  <FontAwesomeIcon icon={faPlus} className="mr-2" /> Nuevo Asunto
                 </button>
               </div>
             </div>

@@ -145,7 +145,7 @@ export default function Dashboard() {
       const clients = [...new Set(formattedTasks.map(task => task.client))].filter(Boolean);
       setUniqueClients(clients);
     } catch (error) {
-      console.error("Error al obtener las tareas:", error);
+      console.error("Error al obtener los asuntos:", error);
     }
   }, [getToken]);
 
@@ -224,7 +224,7 @@ export default function Dashboard() {
 
   // Calculate pagination for each table
   const totalPermanentPages = Math.ceil(filteredClientSummary.length / itemsPerPage);
-  const totalTasksPages = Math.ceil(searchedTasks.length / itemsPerPage);
+  
 
   const paginatedClientSummary = filteredClientSummary.slice(
     (currentPermanentPage - 1) * itemsPerPage,
@@ -384,80 +384,6 @@ export default function Dashboard() {
               <button
                 onClick={() => setCurrentPermanentPage(prev => Math.min(prev + 1, totalPermanentPages))}
                 disabled={currentPermanentPage === totalPermanentPages}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-          {/* Tasks Section */}
-          <div className="bg-white p-4 rounded-lg shadow-lg mt-6 text-black">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-semibold">Tareas Actuales</h2>
-              <div className="flex items-center gap-4">
-                <div className="relative w-64">
-                  <input
-                    type="text"
-                    placeholder="Buscar por título, estado o área..."
-                    value={tasksSearch}
-                    onChange={(e) => setTasksSearch(e.target.value)}
-                    className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <div className="absolute left-3 top-2.5 text-gray-400">
-                    <FontAwesomeIcon icon={faSearch} />
-                  </div>
-                </div>
-                <select
-                  value={selectedClient}
-                  onChange={(e) => setSelectedClient(e.target.value)}
-                  className="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">Todos los Clientes</option>
-                  {uniqueClients.map((client, index) => (
-                    <option key={index} value={client}>{client}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <table className="w-full border border-black rounded-lg overflow-hidden">
-              <thead>
-                <tr className="bg-[#4901ce] text-white">
-                  <th className="border border-black p-2 text-left">Título</th>
-                  <th className="border border-black p-2 text-left">Estado</th>
-                  <th className="border border-black p-2 text-left">Cliente</th>
-                  <th className="border border-black p-2 text-left">Área</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedTasks.length > 0 ? (
-                  paginatedTasks.map((task) => (
-                    <tr key={task.id} className={`hover:bg-gray-50 ${getStatusColor(task.status)}`}>
-                      <td className="border border-black p-2">{task.title}</td>
-                      <td className="border border-black p-2">{task.status}</td>
-                      <td className="border border-black p-2">{task.client}</td>
-                      <td className="border border-black p-2">{task.area}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan={4} className="border p-2 text-center text-gray-500">No hay tareas para mostrar.</td></tr>
-                )}
-              </tbody>
-            </table>
-            {/* Pagination for Tasks */}
-            <div className="flex justify-between items-center mt-4">
-              <button
-                onClick={() => setCurrentTasksPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentTasksPage === 1}
-                className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
-              >
-                Anterior
-              </button>
-              <span className="text-gray-700">
-                Página {currentTasksPage} de {totalTasksPages}
-              </span>
-              <button
-                onClick={() => setCurrentTasksPage(prev => Math.min(prev + 1, totalTasksPages))}
-                disabled={currentTasksPage === totalTasksPages}
                 className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
               >
                 Siguiente
