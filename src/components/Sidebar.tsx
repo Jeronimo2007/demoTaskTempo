@@ -59,13 +59,7 @@ export default function Sidebar() {
         >
           Eventos
         </button>)}
-        {user && ['admin', 'socio'].includes(user.role) && (
-        <button
-          onClick={() => router.push("/lawspace/dashboard/admin_panel/events_panel/rentability_panel")}
-          className="w-full text-left px-4 py-2 rounded hover:bg-gray-700 transition"
-        >
-          Rentabilidad
-        </button>)}
+        
         {/* Add more buttons here as needed */}
       </nav>
     </aside>

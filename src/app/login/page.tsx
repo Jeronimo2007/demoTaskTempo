@@ -75,9 +75,7 @@ export default function LoginPage() {
           <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 109.8 512 0 402.2 0 256S109.8 0 244 0c73 0 135.3 29.7 181.4 78.2l-62.9 54.4c-24.4-23.3-58.4-37.8-98.5-37.8-74.8 0-136.5 61.5-136.5 137S144.7 384 219.5 384c43.4 0 79.7-14.7 105.8-39.2l64.3 64.3C380.8 468.8 318.2 512 244 512zM445.9 261.8h-201.9v-87.1h114.3c-4.8-30.3-19.1-56.6-41.3-76.1l64.3-64.3C404.6 86.6 445.9 169.3 445.9 261.8z"/></svg>
           Ingresar con Google
         </button>
-        <p className="text-sm text-center mt-4"> {/* Increased margin-top */}
-          ¿No tienes cuenta? <a href="/register" className="text-blue-500">Regístrate</a>
-        </p>
+        
       </div>
     </div>
   );

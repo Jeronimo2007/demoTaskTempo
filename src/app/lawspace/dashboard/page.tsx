@@ -1,4 +1,5 @@
 "use client";
+import { Table, Collapse } from "antd";
 
 import { useRouter } from "next/navigation";
 // import { useAuthStore } from "@/store/useAuthStore"; // Remove useAuthStore
@@ -13,6 +14,8 @@ import { addDays, subYears } from "date-fns";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
+
+const { Panel } = Collapse;
 
 // Constantes para el manejo de tokens
 const TOKEN_KEY = "token";
@@ -38,6 +41,433 @@ type ClientSummaryData = {
   current_month_hours: number;
   cost_current_month: number;
 };
+//
+// --- Rentability Panel Types and Components (moved from rentability_panel/page.tsx) ---
+
+interface RentabilityData {
+  total_salarios: number;
+  total_horas_trabajadas: number;
+  total_ingresos: number;
+  rentabilidad_oficina: number;
+}
+
+interface LawyerCostVsHoursData {
+  username: string;
+  salary: number;
+  worked_hours: number;
+  cost_per_hour_firma: number;
+  cost_per_hour_client: number;
+  ingresos_generados: number;
+  utilidad_por_hora: number;
+}
+
+interface LawyerWorkloadData {
+  username: string;
+  worked_hours_this_week: number;
+  weekly_hours_expected: number;
+  worked_hours_this_month: number;
+  monthly_hours_expected: number;
+}
+
+interface ClientContribution {
+  user_id: number;
+  username: string;
+  worked_hours: number;
+  porcentaje_contribucion: number;
+}
+
+interface ClientContributionData {
+  client_id: number;
+  client_name: string;
+  total_hours: number;
+  contributions: ClientContribution[];
+}
+
+const OfficeRentabilitySummary = () => {
+  const [rentabilityData, setRentabilityData] = useState<RentabilityData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRentabilityData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/rentability/office/summary`);
+        if (!response.ok) {
+          throw new Error("HTTP error! Status: " + response.status);
+        }
+        const data: RentabilityData = await response.json();
+        setRentabilityData(data);
+      } catch (error) {
+        console.error("Could not fetch rentability data:", error);
+        setRentabilityData({
+          total_salarios: 0,
+          total_horas_trabajadas: 0,
+          total_ingresos: 0,
+          rentabilidad_oficina: 0,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRentabilityData();
+  }, []);
+
+  const columns = [
+    {
+      title: 'Total Salarios',
+      dataIndex: 'total_salarios',
+      key: 'total_salarios',
+    },
+    {
+      title: 'Total Horas Trabajadas',
+      dataIndex: 'total_horas_trabajadas',
+      key: 'total_horas_trabajadas',
+    },
+    {
+      title: 'Total Ingresos',
+      dataIndex: 'total_ingresos',
+      key: 'total_ingresos',
+    },
+    {
+      title: 'Rentabilidad Oficina',
+      dataIndex: 'rentabilidad_oficina',
+      key: 'rentabilidad_oficina',
+    },
+  ];
+
+  const data = rentabilityData ? [rentabilityData] : [];
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+      <Table
+        columns={columns}
+        dataSource={data}
+        rowKey={(record, index = 0) => index.toString()}
+        loading={loading}
+        pagination={false}
+      />
+    </div>
+  );
+};
+
+const LawyersCostVsHours = () => {
+  const [data, setData] = useState<LawyerCostVsHoursData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/rentability/lawyers/cost-vs-hours`);
+        if (!response.ok) {
+          throw new Error("HTTP error! Status: " + response.status);
+        }
+        const data: LawyerCostVsHoursData[] = await response.json();
+        setData(data);
+      } catch (error) {
+        console.error("Could not fetch lawyer cost vs hours data:", error);
+        setData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const columns = [
+    {
+      title: 'Abogado',
+      dataIndex: 'username',
+      key: 'username',
+    },
+    {
+      title: 'Salario',
+      dataIndex: 'salary',
+      key: 'salary',
+    },
+    {
+      title: 'Horas Trabajadas',
+      dataIndex: 'worked_hours',
+      key: 'worked_hours',
+    },
+    {
+      title: 'Coste por Hora (Firma)',
+      dataIndex: 'cost_per_hour_firma',
+      key: 'cost_per_hour_firma',
+    },
+    {
+      title: 'Coste por Hora (Cliente)',
+      dataIndex: 'cost_per_hour_client',
+      key: 'cost_per_hour_client',
+    },
+    {
+      title: 'Ingresos Generados',
+      dataIndex: 'ingresos_generados',
+      key: 'ingresos_generados',
+    },
+    {
+      title: 'Utilidad por Hora',
+      dataIndex: 'utilidad_por_hora',
+      key: 'utilidad_por_hora',
+    },
+  ];
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+      <Table
+        columns={columns}
+        dataSource={data}
+        rowKey={(record, index = 0) => index.toString()}
+        loading={loading}
+        pagination={false}
+      />
+    </div>
+  );
+};
+
+import { Tabs } from "antd";
+
+const LawyersWeeklyWorkload = () => {
+  const [data, setData] = useState<LawyerWorkloadData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"week" | "month">("week");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/rentability/lawyers/weekly-workload`);
+        if (!response.ok) {
+          throw new Error("HTTP error! Status: " + response.status);
+        }
+        const data: LawyerWorkloadData[] = await response.json();
+        setData(data);
+      } catch (error) {
+        console.error("Could not fetch lawyer workload data:", error);
+        setData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const weekColumns = [
+    {
+      title: 'Abogado',
+      dataIndex: 'username',
+      key: 'username',
+    },
+    {
+      title: 'Horas Trabajadas Esta Semana',
+      dataIndex: 'worked_hours_this_week',
+      key: 'worked_hours_this_week',
+    },
+    {
+      title: 'Horas Esperadas Esta Semana',
+      dataIndex: 'weekly_hours_expected',
+      key: 'weekly_hours_expected',
+    },
+  ];
+
+  const monthColumns = [
+    {
+      title: 'Abogado',
+      dataIndex: 'username',
+      key: 'username',
+    },
+    {
+      title: 'Horas Trabajadas Este Mes',
+      dataIndex: 'worked_hours_this_month',
+      key: 'worked_hours_this_month',
+    },
+    {
+      title: 'Horas Esperadas Este Mes',
+      dataIndex: 'monthly_hours_expected',
+      key: 'monthly_hours_expected',
+    },
+  ];
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+      <Tabs
+        activeKey={view}
+        onChange={key => setView(key as "week" | "month")}
+        items={[
+          {
+            key: "week",
+            label: "Semana",
+            children: (
+              <Table
+                columns={weekColumns}
+                dataSource={data}
+                rowKey={(record, index = 0) => index.toString()}
+                loading={loading}
+                pagination={false}
+              />
+            ),
+          },
+          {
+            key: "month",
+            label: "Mes",
+            children: (
+              <Table
+                columns={monthColumns}
+                dataSource={data}
+                rowKey={(record, index = 0) => index.toString()}
+                loading={loading}
+                pagination={false}
+              />
+            ),
+          },
+        ]}
+      />
+    </div>
+  );
+};
+
+const ClientsContributions = () => {
+  const [data, setData] = useState<ClientContributionData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_URL}/rentability/clients/contributions`);
+        if (!response.ok) {
+          throw new Error("HTTP error! Status: " + response.status);
+        }
+        const data: ClientContributionData[] = await response.json();
+        setData(data);
+      } catch (error) {
+        console.error("Could not fetch clients contributions data:", error);
+        setData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Filter data based on search term
+  const filteredData = data.filter(client => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      client.client_name.toLowerCase().includes(searchLower) ||
+      client.contributions.some(contribution =>
+        contribution.username.toLowerCase().includes(searchLower)
+      )
+    );
+  });
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const columns = [
+    {
+      title: 'Cliente',
+      dataIndex: 'client_name',
+      key: 'client_name',
+    },
+    {
+      title: 'Total Horas',
+      dataIndex: 'total_hours',
+      key: 'total_hours',
+    },
+    {
+      title: 'Contribuciones',
+      key: 'contributions',
+      render: (record: ClientContributionData) => (
+        <Table
+          columns={[
+            {
+              title: 'Abogado',
+              dataIndex: 'username',
+              key: 'username',
+            },
+            {
+              title: 'Horas Trabajadas',
+              dataIndex: 'worked_hours',
+              key: 'worked_hours',
+            },
+            {
+              title: 'Porcentaje de Contribución',
+              dataIndex: 'porcentaje_contribucion',
+              key: 'porcentaje_contribucion',
+            },
+          ]}
+          dataSource={record.contributions}
+          rowKey={(record, index = 0) => index.toString()}
+          pagination={false}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <div className="relative w-64">
+          <input
+            type="text"
+            placeholder="Buscar por cliente o abogado..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="absolute left-3 top-2.5 text-gray-400">
+            <FontAwesomeIcon icon={faSearch} />
+          </div>
+        </div>
+      </div>
+      <Table
+        columns={columns}
+        dataSource={paginatedData}
+        rowKey={(record, index = 0) => index.toString()}
+        loading={loading}
+        pagination={false}
+      />
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-4">
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+        >
+          Anterior
+        </button>
+        <span className="text-gray-700">
+          Página {currentPage} de {totalPages}
+        </span>
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+};
+// --- End Rentability Panel Section ---
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -231,10 +661,6 @@ export default function Dashboard() {
     currentPermanentPage * itemsPerPage
   );
 
-  const paginatedTasks = searchedTasks.slice(
-    (currentTasksPage - 1) * itemsPerPage,
-    currentTasksPage * itemsPerPage
-  );
 
   // Reset pagination when filters or search changes
   useEffect(() => {
@@ -286,7 +712,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="p-6">
-          <h1 className="text-2xl font-bold mb-4 text-black">Dashboard</h1>
+          <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">Dashboard</h1>
 
           {/* Selector de Fecha */}
           <div className="flex gap-4 mb-4">
@@ -392,6 +818,29 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Rentability Panel Section - Only visible to socios */}
+      <ProtectedRoute allowedRoles={['socio']}>
+        <div className="p-6 mt-8 text-black bg-white rounded-lg shadow-lg">
+          <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">
+            Panel de Rentabilidad
+          </h1>
+          <Collapse defaultActiveKey={['1']}>
+            <Panel header="Resumen de Rentabilidad de SSL" key="1">
+              <OfficeRentabilitySummary />
+            </Panel>
+            <Panel header="Coste por Hora de Abogados mensualmente" key="2">
+              <LawyersCostVsHours />
+            </Panel>
+            <Panel header="Carga de Abogados por Semana / Mes" key="3">
+              <LawyersWeeklyWorkload />
+            </Panel>
+            <Panel header="Contribuciones de Clientes" key="4">
+              <ClientsContributions />
+            </Panel>
+          </Collapse>
+        </div>
+      </ProtectedRoute>
     </ProtectedRoute>
   );
 }
