@@ -71,7 +71,7 @@ export const taskService = {
         client_id: Number(task.client_id), // Ensure client_id is number
         name: task.title // Keep mapping title to name for compatibility? Review if 'name' is still needed.
       }));
-    } catch (error) {
+    } catch {
       return [];
     }
   },
@@ -96,7 +96,7 @@ export const taskService = {
       );
 
       return response.data;
-    } catch (error) {
+    } catch {
       return [];
     }
   },
@@ -127,8 +127,8 @@ export const taskService = {
           ...response.data,
           client_id: Number(response.data.client_id) // Ensure client_id is number in returned object
       };
-    } catch (error) {
-      throw error;
+    } catch {
+      throw new Error("Failed to create task");
     }
   },
 
@@ -165,8 +165,8 @@ export const taskService = {
           ...response.data,
           client_id: Number(response.data.client_id) // Ensure client_id is number in returned object
       };
-    } catch (error) {
-      throw error;
+    } catch {
+      throw new Error("Failed to update task");
     }
   },
 
@@ -179,8 +179,8 @@ export const taskService = {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
-    } catch (error) {
-      throw error;
+    } catch {
+      throw new Error("Failed to delete task");
     }
   },
 
@@ -194,7 +194,7 @@ export const taskService = {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
-    } catch (error) {
+    } catch {
       return [];
     }
   }
@@ -211,7 +211,7 @@ taskService.getTasksByClient = async (clientId: number): Promise<Task[]> => {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data;
-  } catch (error) {
+  } catch {
     return [];
   }
 };

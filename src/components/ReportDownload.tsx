@@ -23,6 +23,25 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
   const [taskTabAvailableTasks, setTaskTabAvailableTasks] = useState<{ id: number; title: string }[]>([]);
   const [taskTabLoadingTasks, setTaskTabLoadingTasks] = useState(false);
 
+  // Move useEffect to top level
+  React.useEffect(() => {
+    const fetchTasks = async () => {
+      if (activeTab === 'task' && taskTabClientId) {
+        setTaskTabLoadingTasks(true);
+        try {
+          const tasks = await taskService.getTasksByClient(Number(taskTabClientId));
+          setTaskTabAvailableTasks(tasks);
+        } catch (error) {
+          console.error('Error fetching tasks:', error);
+        } finally {
+          setTaskTabLoadingTasks(false);
+        }
+      }
+    };
+
+    fetchTasks();
+  }, [activeTab, taskTabClientId]);
+
   if (user?.role === 'consultor') {
     return null;
   }
@@ -68,21 +87,6 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
     const formattedEndDate = endDate.toISOString(); // Full ISO string if needed
     downloadReport('/reports/download_client_report', { client_id: parseInt(selectedClientId), start_date: formattedStartDate, end_date: formattedEndDate });
   };
-
-  // Fetch tasks for the selected client in Task Report tab
-  React.useEffect(() => {
-    if (activeTab === 'task' && taskTabClientId) {
-      setTaskTabLoadingTasks(true);
-      taskService.getTasksByClient(Number(taskTabClientId))
-        .then((tasks) => {
-          setTaskTabAvailableTasks(tasks);
-        })
-        .finally(() => setTaskTabLoadingTasks(false));
-    } else if (activeTab === 'task') {
-      setTaskTabAvailableTasks([]);
-      setSelectedTaskId('');
-    }
-  }, [activeTab, taskTabClientId]);
 
   const handleDownloadTaskReport = () => {
     if (!taskTabClientId) {

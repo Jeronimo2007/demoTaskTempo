@@ -1,4 +1,5 @@
 "use client";
+import Image from 'next/image';
 
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
@@ -13,10 +14,12 @@ export default function Sidebar() {
     <aside className="min-h-screen w-64 bg-gray-900 text-white flex flex-col p-4">
       {/* Logo de Task Tempo en la parte superior */}
       <div className="flex justify-center mb-4 mt-2">
-        <img 
-          src="/img/TaskTempoLogo.png" 
-          alt="Task Tempo Logo" 
-          className="h-60 object-contain" // Increased height from h-12 to h-16
+        <Image
+          src="/img/TaskTempoLogo.png"
+          alt="Task Tempo Logo"
+          className="h-60 object-contain"
+          width={240}
+          height={240}
         />
       </div>
       

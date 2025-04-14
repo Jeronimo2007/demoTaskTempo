@@ -79,7 +79,7 @@ const InvoiceByHoursForm: React.FC<InvoiceByHoursFormProps> = ({
         .then((res) => {
           setTasks(res.data || []);
         })
-        .catch((err) => {
+        .catch(() => {
           setTasks([]);
           showNotification("Error", "No se pudieron cargar las tareas del cliente", "error");
         })

@@ -174,18 +174,10 @@ const Workspace: React.FC = () => {
     } finally {
       setIsLoadingEntries(false);
     }
-  }, [user]);
+  }, [user, filteredTasks]);
 
-  const fetchData = useCallback(async (token: string) => {
-    if (!user) {
-      return;
-    }
-
-    setIsLoading(true);
+  const fetchAllTasks = useCallback(async () => {
     try {
-      const isElevated = hasElevatedPermissions();
-      await Promise.all([fetchUsers(token), fetchClients()]);
-
       const currentDate = new Date();
       const startDate = new Date(currentDate);
       startDate.setDate(currentDate.getDate() - currentDate.getDay());
@@ -217,63 +209,109 @@ const Workspace: React.FC = () => {
       }));
 
       setAllTasks(allTasksConverted);
+      const uniqueClientNames = [...new Set(allTasksConverted
+        .filter(task => task.client)
+        .map(task => task.client))] as string[];
 
-      if (isElevated) {
-        const uniqueClientNames = [...new Set(allTasksConverted
-          .filter(task => task.client)
-          .map(task => task.client))] as string[]; // Add type assertion
+      const clientOptions = uniqueClientNames
+        .filter(Boolean)
+        .map(clientName => ({
+          id: clientName,
+          label: clientName
+        }));
 
-        const clientOptions = uniqueClientNames
-          .filter(Boolean) // Remove any null/undefined values
-          .map(clientName => ({
-            id: clientName,
-            label: clientName
-          }));
+      setAvailableClients(clientOptions);
+      setFilteredTasks(allTasksConverted);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching all tasks:', error);
+      setError('Failed to load tasks. Please try again later.');
+    }
+  }, []);
 
-        setAvailableClients(clientOptions);
-        setFilteredTasks(allTasksConverted);
-        setError(null);
-
-        fetchTimeEntries(allTasksConverted);
+  const fetchUserTasks = useCallback(async () => {
+    try {
+      const userId = user?.id;
+      if (!userId) {
+        setError('User ID not available');
         return;
       }
 
-      try {
-        const userId = user.id;
-        const assignedTasks = await taskService.getAssignedTasks(userId);
+      const currentDate = new Date();
+      const startDate = new Date(currentDate);
+      startDate.setDate(currentDate.getDate() - currentDate.getDay());
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(currentDate);
+      endDate.setDate(currentDate.getDate() + (6 - currentDate.getDay()));
+      endDate.setHours(23, 59, 59, 999);
 
-        if (assignedTasks && assignedTasks.length > 0) {
-          const assignedTaskIds = assignedTasks.map(item => item.task_id);
-          const filteredTasks = allTasksConverted.filter((task: Task) =>
-            assignedTaskIds.includes(task.id)
-          );
+      const allTasksData = await taskService.getAllTasks(startDate, endDate);
+      const assignedTasks = await taskService.getAssignedTasks(userId);
 
-          setFilteredTasks(filteredTasks);
-          setError(null);
-
-          fetchTimeEntries(filteredTasks);
-          return;
-        } else {
-          setFilteredTasks([]);
-          fetchTimeEntries([]);
+      const allTasksConverted = await Promise.all(allTasksData.map(async (task: Task) => {
+        const clientId = task.client_id !== undefined ? task.client_id : null;
+        let clientName = 'Cliente no asignado';
+        if (task.client) {
+          clientName = task.client;
+        } else if (clientId) {
+          try {
+            clientName = await clientService.getClientName(clientId);
+          } catch (err) {
+            console.error(`Error getting client name for ID ${clientId}:`, err);
+          }
         }
-      } catch (error) {
-        console.error('Error fetching assigned tasks:', error);
+
+        return {
+          ...task,
+          client_id: clientId,
+          client_name: clientName
+        } as Task;
+      }));
+
+      setAllTasks(allTasksConverted);
+
+      if (assignedTasks && assignedTasks.length > 0) {
+        const assignedTaskIds = assignedTasks.map(item => item.task_id);
+        const filteredTasks = allTasksConverted.filter((task: Task) =>
+          assignedTaskIds.includes(task.id)
+        );
+
+        setFilteredTasks(filteredTasks);
+        setError(null);
+      } else {
         setFilteredTasks([]);
-        setError('Error fetching assigned tasks. Please try again later.');
-        fetchTimeEntries([]);
+        setError('No tasks assigned to you.');
+      }
+    } catch (error) {
+      console.error('Error fetching user tasks:', error);
+      setFilteredTasks([]);
+      setError('Failed to load tasks. Please try again later.');
+    }
+  }, [user?.id]);
+
+  const fetchData = useCallback(async (token: string) => {
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      await Promise.all([
+        fetchUsers(token),
+        fetchClients(),
+        fetchTimeEntries(),
+      ]);
+
+      if (hasElevatedPermissions()) {
+        await fetchAllTasks();
+      } else {
+        await fetchUserTasks();
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        router.push('/login');
-      } else {
-        setError('Failed to load tasks. Please try again later.');
-      }
+      setError('Failed to load data. Please try again later.');
     } finally {
       setIsLoading(false);
     }
-  }, [user, hasElevatedPermissions, fetchUsers, fetchClients, router]);
+  }, [user, hasElevatedPermissions, fetchUsers, fetchClients, fetchTimeEntries, fetchAllTasks, fetchUserTasks]);
 
   useEffect(() => {
     const checkAuthAndFetchData = async () => {
@@ -307,11 +345,14 @@ const Workspace: React.FC = () => {
         return;
       }
 
-      fetchData(token);
+      // Only fetch data if we haven't already loaded it
+      if (allTasks.length === 0 && timeEntries.length === 0) {
+        fetchData(token);
+      }
     };
 
     checkAuthAndFetchData();
-  }, [getToken, router, user, setUser, fetchData]);
+  }, [getToken, router, user, setUser, fetchData, allTasks.length, timeEntries.length]);
 
   const handleRefreshTimeEntries = useCallback(async (startDate?: Date, endDate?: Date) => {
     try {
@@ -425,7 +466,7 @@ const Workspace: React.FC = () => {
       console.error('Error refreshing time entries:', error);
       return false;
     }
-  }, [selectedClient, hasElevatedPermissions, user, fetchUsers, fetchClients, getToken, allTasks, timeEntries]);
+  }, [hasElevatedPermissions, user, fetchUsers, fetchClients, getToken, selectedClient]);
 
   const handleTimeEntryCreate = async (entry: TimeEntry): Promise<void> => {
     try {

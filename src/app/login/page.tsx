@@ -1,13 +1,13 @@
 'use client'
-
-import { useState, useEffect } from "react";
+import Image from 'next/image';
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginUser } from "@/services/authService";
 import { useAuthStore } from "@/store/useAuthStore";
 
 
 export default function LoginPage() {
-  const { setUser, user } = useAuthStore();
+  const { setUser } = useAuthStore();
   const router = useRouter();
   const [email, setEmail] = useState(""); // Renamed from username
   const [password, setPassword] = useState("");
@@ -38,10 +38,13 @@ export default function LoginPage() {
     <div className="flex h-screen justify-center items-center bg-gray-100">
       <div className="bg-white p-6 rounded-lg shadow-lg w-96 text-black">
       <div className="flex justify-center mb-4 mt-2">
-        <img 
-          src="/img/logo.jpeg" 
-          alt="SSL" 
+
+        <Image
+          src="/img/logo.jpeg"
+          alt="SSL"
           className="h-60 object-contain" // Increased height from h-12 to h-16
+          width={240} // Specify width
+          height={240} // Specify height
         />
       </div>
         <h2 className="text-xl font-bold mb-4 text-center">Iniciar Sesión</h2>

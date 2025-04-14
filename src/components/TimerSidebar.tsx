@@ -78,9 +78,11 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
   
   // Clean up timers when component unmounts
   useEffect(() => {
+    const timerIntervalsRefCurrent = timerIntervalsRef.current;
+
     return () => {
       // Clear all interval timers
-      timerIntervalsRef.current.forEach((intervalId) => {
+      timerIntervalsRefCurrent.forEach((intervalId) => {
         window.clearInterval(intervalId);
       });
       
@@ -92,7 +94,7 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
       // Ensure we notify that no timer is active when component unmounts
       notifyTimerStateChange(false);
     };
-  }, [notifyTimerStateChange, errorTimeout, timerIntervalsRef]);
+  }, [notifyTimerStateChange, errorTimeout]);
   
   // Use localStorage to save timers state between page refreshes
   // Fetch clients on mount
@@ -489,11 +491,6 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
   };
 
   // Helper function to get client name from task
-  const getClientName = (task: Task): string => {
-    if (task.client_name) return task.client_name;
-    if (task.client) return task.client;
-    return 'Sin cliente';
-  };
 
   // Get active timers for display in the toggle button
   const getActiveTimers = () => {

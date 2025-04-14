@@ -122,8 +122,8 @@ const clientService = {
       clientCache[client.id] = clientObj;
 
       return clientObj;
-    } catch (error) {
-      throw error;
+    } catch {
+      return null as unknown as Client;
     }
   },
 
@@ -170,8 +170,8 @@ const clientService = {
       clientCache[client.id] = clientObj;
 
       return clientObj;
-    } catch (error) {
-      throw error;
+    } catch {
+      return null as unknown as Client;
     }
   },
 
@@ -223,7 +223,7 @@ const clientService = {
       
       
       return clients;
-    } catch (error) {
+    } catch {
       // Return empty array instead of throwing to prevent app crashes
       return [];
     }
@@ -277,7 +277,7 @@ const clientService = {
       clientCache[clientIdNum] = clientObj;
       
       return clientObj;
-    } catch (error) {
+    } catch {
       // Cache the null result to avoid repeated failed lookups
       clientCache[clientIdNum] = null;
       return null;
@@ -343,7 +343,7 @@ export const getClientName = async (clientId: number): Promise<string> => {
   try {
     const response = await axios.get<ClientResponse>(`${API_URL}/clients/${clientId}`);
     return response.data.name || response.data.nombre || response.data.client_name || `Cliente ${clientId}`;
-  } catch (error) {
+  } catch {
     return `Cliente ${clientId}`;
   }
 };

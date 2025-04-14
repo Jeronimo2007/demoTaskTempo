@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { timeEntriesService, TimeEntry } from '../../services/timeEntriesService';
 
 // Puedes importar aquí tu componente de calendario preferido
@@ -35,7 +35,7 @@ const CalendarComponent: React.FC = () => {
   }
   
   // Función para cargar los time entries
-  const loadTimeEntries = async () => {
+  const loadTimeEntries = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -52,12 +52,12 @@ const CalendarComponent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange.startDate, dateRange.endDate]);
   
   // Cargar time entries cuando cambia el rango de fechas
   useEffect(() => {
     loadTimeEntries();
-  }, [dateRange.startDate, dateRange.endDate]);
+  }, [dateRange.startDate, dateRange.endDate, loadTimeEntries]);
   
   // Función para manejar el cambio de semana
   const handleWeekChange = (newStartDate: Date) => {

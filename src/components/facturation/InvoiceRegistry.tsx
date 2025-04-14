@@ -40,8 +40,9 @@ interface InvoiceRegistryProps {
 
 const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNotification }) => {
   // Estado para las fechas de inicio y fin (3 meses atrás hasta mañana)
+  // Por defecto: fecha inicial = hace 1 mes, fecha final = mañana
   const [startDate, setStartDate] = useState<string>(
-    format(subMonths(new Date(), 3), 'yyyy-MM-dd')
+    format(subMonths(new Date(), 1), 'yyyy-MM-dd')
   );
   const [endDate, setEndDate] = useState<string>(
     format(addDays(new Date(), 1), 'yyyy-MM-dd')
@@ -257,6 +258,58 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
     setCurrentPage(1);
   }, [selectedClientId, startDate, endDate]);
 
+  // Estado para descarga de Excel
+  const [downloading, setDownloading] = useState<boolean>(false);
+
+  // Función para descargar el registro en Excel
+  const handleDownloadExcel = async () => {
+    if (!token || !apiUrl) {
+      showNotification('Error', 'No hay token de autenticación o URL de API', 'error');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const response = await axios.get(`${apiUrl}/reports/invoices/registry/excel`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        params: {
+          start_date: startDate,
+          end_date: endDate
+        },
+        responseType: 'blob'
+      });
+
+      // Obtener nombre sugerido del archivo desde el header o usar uno por defecto
+      let filename = 'registro_facturas.xlsx';
+      const disposition = response.headers['content-disposition'];
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) {
+          filename = decodeURIComponent(match[1]);
+        }
+      }
+
+      // Crear enlace de descarga
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showNotification('Éxito', 'El registro se descargó correctamente.', 'success');
+    } catch (err) {
+      console.error('Error al descargar el registro en Excel:', err);
+      showNotification('Error', 'No se pudo descargar el registro en Excel.', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border shadow-sm p-6 mt-8">
       <div className="mb-6">
@@ -347,7 +400,7 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
         <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded">
           <p className="font-medium">Advertencia: Algunas órdenes no tienen ID de cliente asignado.</p>
           <p className="text-sm mt-1">Esto puede afectar el funcionamiento del filtro por cliente.</p>
-          <button 
+          <button
             onClick={handleShowOnlyMissingClientIds}
             className="mt-2 px-2 py-1 text-xs bg-yellow-200 text-yellow-800 rounded hover:bg-yellow-300"
           >
@@ -458,6 +511,19 @@ const InvoiceRegistry: React.FC<InvoiceRegistryProps> = ({ token, apiUrl, showNo
           </button>
         </div>
       )}
+
+      {/* Botón para descargar el registro en Excel */}
+      <div className="flex justify-end mt-6">
+        <button
+          onClick={handleDownloadExcel}
+          disabled={downloading || loading}
+          className={`px-6 py-2 rounded-md font-medium text-white ${
+            downloading || loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'
+          } transition`}
+        >
+          {downloading ? 'Descargando...' : 'Descargar registro en Excel'}
+        </button>
+      </div>
     </div>
   );
 };

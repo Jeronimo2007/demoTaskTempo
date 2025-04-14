@@ -110,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setTasks([]);
         }
       }
-    } catch (error) {
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -147,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // Force update tasks after saving an entry
     // Pass the current user from the component scope here
     fetchTasks(true, user);
-  }, [pathname, fetchTasks]);
+  }, [pathname, fetchTasks, user]);
 
 // Effect specifically for handling Google Auth redirect parameters ONCE
 useEffect(() => {
@@ -161,14 +161,14 @@ useEffect(() => {
     try {
       const userToSet = { id: googleUserId, username: googleUsername, role: googleRole };
       // Set user state
-+      setUser(userToSet, googleAccessToken);
+    setUser(userToSet, googleAccessToken);
       setGoogleParamsProcessed(true); // Mark as processed to prevent re-running logic
 
       // Clean the URL parameters
       router.replace('/lawspace', undefined); // Clean URL - added undefined scroll option
 
       // No return needed here as this effect should only run when params change
-    } catch (error) {
+    } catch {
       router.push('/login?error=google_auth_failed');
     }
   } else if (!googleParamsProcessed && (googleAccessToken || googleUserId || googleUsername || googleRole)) {
@@ -205,7 +205,7 @@ useEffect(() => {
         setUser(JSON.parse(storedUser), storedToken); // This triggers a re-render, but doesn't affect this run
         // Note: fetchTasks will be called in the *next* run of this effect because 'user' dependency changed
         return; // Session recovered, exit check for this run
-      } catch (error) {
+      } catch {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
       }
@@ -223,7 +223,7 @@ useEffect(() => {
 
   checkAuthAndFetch();
   // Dependencies: user state, router, setUser, fetchTasks. Crucially, NOT searchParams here.
-}, [user, router, setUser, fetchTasks]); // Removed searchParams
+}, [user, router, setUser, fetchTasks, searchParams]);
 
   // Refresh tasks periodically or when user changes
   useEffect(() => {

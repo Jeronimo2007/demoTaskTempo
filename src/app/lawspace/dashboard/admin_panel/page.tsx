@@ -67,7 +67,7 @@ export default function AdminPanel() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Simple notification function (replace with toast if needed)
-  const showNotification = (title: string, message: string, type: 'success' | 'error') => {
+  const showNotification = (title: string, message: string) => {
     window.alert(`${title}: ${message}`);
   };
 
@@ -297,27 +297,29 @@ export default function AdminPanel() {
 
       updatableKeys.forEach(key => {
         if (key in editingTask && editingTask[key] !== originalTask[key]) {
-          if (key === 'total_value') {
-            if (editingTask.billing_type === 'percentage') {
-              payload[key] = editingTask[key];
-            } else if (originalTask.total_value !== null) {
-              payload[key] = null;
-            }
+          if (key === 'title') {
+            payload.title = editingTask[key] as string;
+          } else if (key === 'status') {
+            payload.status = editingTask[key] as string;
+          } else if (key === 'due_date') {
+            payload.due_date = editingTask[key] as string | undefined;
+          } else if (key === 'area') {
+            payload.area = editingTask[key] as string;
           } else if (key === 'billing_type') {
-            payload[key] = editingTask[key];
+            payload.billing_type = editingTask[key] as 'hourly' | 'percentage';
             if (editingTask[key] === 'hourly' && originalTask.billing_type === 'percentage') {
               payload.total_value = null;
             } else if (editingTask[key] === 'percentage' && editingTask.total_value !== originalTask.total_value) {
               payload.total_value = editingTask.total_value;
             }
           } else if (key === 'note') {
-            payload[key] = editingTask[key] || null; // Backend likely expects null for empty optional string
-          } else if (key === 'due_date') {
-            // Ensure due_date is sent correctly, use undefined for empty string to match Task type
-            payload[key] = editingTask[key] || undefined; // Line 304 corrected
-          }
-          else {
-            payload[key as keyof typeof payload] = editingTask[key] as any;
+            payload.note = editingTask[key] as string | null;
+          } else if (key === 'total_value') {
+            if (editingTask.billing_type === 'percentage') {
+              payload.total_value = editingTask[key] as number | null;
+            } else if (originalTask.total_value !== null) {
+              payload.total_value = null;
+            }
           }
         }
       });

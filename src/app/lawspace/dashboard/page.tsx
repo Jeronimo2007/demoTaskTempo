@@ -27,20 +27,13 @@ type ReportData = {
   "Total Horas": number;
 };
 
-type TaskData = {
-  id: string;
-  title: string;
-  status: string;
-  client: string;
-  area: string; // Added area property
-};
-
 type ClientSummaryData = {
   client: string;
   monthly_hours: number;
   current_month_hours: number;
   cost_current_month: number;
 };
+
 //
 // --- Rentability Panel Types and Components (moved from rentability_panel/page.tsx) ---
 
@@ -477,23 +470,17 @@ export default function Dashboard() {
   const { user, isAuthenticated, logout } = useAuth(); // Use useAuth hook
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
-  const [tasks, setTasks] = useState<TaskData[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummaryData[]>([]);
-    const [clientNames, setClientNames] = useState<{ id: number; name: string }[]>([]);
   const [startDate, setStartDate] = useState(subYears(new Date(), 1));
   const [endDate, setEndDate] = useState(addDays(new Date(), 1));
   const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' });
-  const [selectedClient, setSelectedClient] = useState<string>("all");
-  const [uniqueClients, setUniqueClients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Add search states
   const [permanentSearch, setPermanentSearch] = useState("");
-  const [tasksSearch, setTasksSearch] = useState("");
 
   // Add pagination states
   const [currentPermanentPage, setCurrentPermanentPage] = useState(1);
-  const [currentTasksPage, setCurrentTasksPage] = useState(1);
   const itemsPerPage = 5;
 
   // Función mejorada para obtener el token, priorizando localStorage y luego cookies
@@ -548,37 +535,6 @@ export default function Dashboard() {
     }
   }, [getToken, startDate, endDate]);
 
-
-  const fetchTasks = useCallback(async () => {
-    try {
-      const token = getToken();
-      if (!token) {
-        console.error("No se encontró el token de autenticación.");
-        return;
-      }
-
-      const response = await axios.get(`${API_URL}/tasks/get_task`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const formattedTasks = (response.data as TaskData[]).map((task) => ({
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        client: task.client,
-        area: task.area || "N/A", // Include area with fallback to "N/A" if not available
-      }));
-
-      setTasks(formattedTasks);
-
-      // Extract unique client names for the filter dropdown
-      const clients = [...new Set(formattedTasks.map(task => task.client))].filter(Boolean);
-      setUniqueClients(clients);
-    } catch (error) {
-      console.error("Error al obtener los asuntos:", error);
-    }
-  }, [getToken]);
-
   const fetchClientSummary = useCallback(async () => {
     try {
       const token = getToken();
@@ -598,24 +554,6 @@ export default function Dashboard() {
   }, [getToken]);
 
   // Function to determine the background color based on task status
-  const getStatusColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case "en proceso":
-        return "bg-yellow-200"; // Amarillo
-      case "finalizado":
-        return "bg-green-200"; // Verde
-      case "vencido":
-        return "bg-red-200"; // Rojo
-      case "cancelado":
-        return "bg-gray-200"; // Gris
-      case "gestionar al cliente":
-        return "bg-purple-200"; // Morado
-      case "gestionar al tercero":
-        return "bg-pink-200"; // Rosa
-      default:
-        return "";
-    }
-  };
 
   // Function to format currency in COP
   const formatCurrency = (amount: number): string => {
@@ -627,9 +565,6 @@ export default function Dashboard() {
   };
 
   // Filter tasks based on selected client
-  const filteredTasks = selectedClient === "all"
-    ? tasks
-    : tasks.filter(task => task.client === selectedClient);
 
   // Add search functionality
   const filteredClientSummary = clientSummary.filter(client => {
@@ -639,16 +574,6 @@ export default function Dashboard() {
       client.current_month_hours.toString().includes(searchLower) ||
       client.monthly_hours.toString().includes(searchLower) ||
       formatCurrency(client.cost_current_month).toLowerCase().includes(searchLower)
-    );
-  });
-
-  const searchedTasks = filteredTasks.filter(task => {
-    const searchLower = tasksSearch.toLowerCase();
-    return (
-      task.title.toLowerCase().includes(searchLower) ||
-      task.status.toLowerCase().includes(searchLower) ||
-      task.client.toLowerCase().includes(searchLower) ||
-      task.area.toLowerCase().includes(searchLower)
     );
   });
 
@@ -663,9 +588,6 @@ export default function Dashboard() {
 
 
   // Reset pagination when filters or search changes
-  useEffect(() => {
-    setCurrentTasksPage(1);
-  }, [selectedClient, tasksSearch]);
 
   useEffect(() => {
     setCurrentPermanentPage(1);
@@ -679,7 +601,6 @@ export default function Dashboard() {
         // ProtectedRoute ensures we are authenticated and authorized
         await Promise.all([
           fetchReportData(),
-          fetchTasks(),
           fetchClientSummary(),
         ]);
       } catch (error) {
@@ -698,7 +619,7 @@ export default function Dashboard() {
     if (isAuthenticated && user) {
       fetchData();
     }
-  }, [isAuthenticated, user, fetchReportData, fetchTasks, fetchClientSummary, logout, router]); // Removed verifyToken, added isAuthenticated, user, logout
+  }, [isAuthenticated, user, fetchReportData, fetchClientSummary, logout, router]); // Removed verifyToken, added isAuthenticated, user, logout
 
   // Loading state handled within ProtectedRoute wrapper
 

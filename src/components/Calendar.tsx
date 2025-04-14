@@ -245,7 +245,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       setLoadingEntries(true);
       try {
         await onRefresh(startDate, endDate);
-      } catch (error) {
+      } catch {
       } finally {
         setLoadingEntries(false);
       }
@@ -272,7 +272,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         
         // Refresh the current week's entries
         fetchTimeEntriesForWeek(currentDate);
-      } catch (err) {
+      } catch {
         setError('Error al guardar la entrada de tiempo. Inténtalo de nuevo.');
       } finally {
         setCreating(false);
@@ -415,7 +415,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
         const endDate = moment(currentDate).endOf('week').toDate();
         
         await onRefresh(startDate, endDate);
-      } catch (err) {
+      } catch {
       } finally {
         setLoadingEntries(false);
       }
