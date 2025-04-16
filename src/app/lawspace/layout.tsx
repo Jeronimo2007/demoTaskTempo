@@ -223,7 +223,7 @@ useEffect(() => {
 
   checkAuthAndFetch();
   // Dependencies: user state, router, setUser, fetchTasks. Crucially, NOT searchParams here.
-}, [user, router, setUser, fetchTasks, searchParams]);
+}, [user, router, setUser, fetchTasks]); // Removed searchParams dependency
 
   // Refresh tasks periodically or when user changes
   useEffect(() => {
