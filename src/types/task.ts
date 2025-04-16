@@ -10,6 +10,7 @@ export interface Task {
   area?: string | null; // Optional
   note?: string | null; // Optional
   total_value?: number | null; // Optional
+  total_billed?: number | null; // Optional float value for billing amounts
   // Keep potentially redundant fields for now to avoid breaking changes elsewhere.
   client?: string;
   name: string;

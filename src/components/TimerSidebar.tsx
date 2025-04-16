@@ -115,7 +115,7 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
           const restoredTimers = parsedState.map(timer => ({
             ...timer,
             startTime: timer.startTime ? new Date(timer.startTime) : null,
-            availableTasks: timer.availableTasks || [],
+            availableTasks: Array.isArray(timer.availableTasks) ? timer.availableTasks : [],
           }));
           if (restoredTimers.length > 0) {
             setTimers(restoredTimers);
@@ -138,12 +138,12 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
     if (timers.length > 0 && timers.some(timer => timer.isRunning || timer.isPaused)) {
       const timersToSave = timers.map(timer => ({
         ...timer,
-        startTime: timer.startTime ? timer.startTime.toISOString() : null,
+        startTime: timer.startTime ? new Date(timer.startTime).toISOString() : null,
         availableTasks: timer.availableTasks || [],
         currentTimeEntry: timer.currentTimeEntry ? {
           ...timer.currentTimeEntry,
-          start_time: timer.currentTimeEntry.start_time ? timer.currentTimeEntry.start_time.toISOString() : undefined,
-          end_time: timer.currentTimeEntry.end_time ? timer.currentTimeEntry.end_time.toISOString() : undefined,
+          start_time: timer.currentTimeEntry.start_time ? new Date(timer.currentTimeEntry.start_time).toISOString() : undefined,
+          end_time: timer.currentTimeEntry.end_time ? new Date(timer.currentTimeEntry.end_time).toISOString() : undefined,
         } : null
       }));
 
@@ -399,8 +399,11 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
       
       // Create the final time entry
       const finalEntry: TimeEntry = {
-        ...timer.currentTimeEntry,
-        end_time: now,
+        ...timer.currentTimeEntry, // Contains taskId and start_time
+        end_time: timer.currentTimeEntry && timer.currentTimeEntry.start_time instanceof Date && !isNaN(timer.currentTimeEntry.start_time.getTime())
+          ? new Date(timer.currentTimeEntry.start_time.getTime() + (timer.elapsedTime * 1000)) // Calculate end_time by adding elapsedTime to start_time
+          : new Date(now.toISOString()), // Fallback to now if start_time is missing or not a Date
+        // duration: timer.elapsedTime, // Removed duration as it's not in TimeEntryCreate model
         description: timer.description
       };
       
@@ -460,11 +463,11 @@ const TimerSidebar: React.FC<TimerSidebarProps> = ({ onTimeEntryCreate, onEntryC
     if (timers.length > 0 && timers.some(timer => timer.isRunning || timer.isPaused)) {
       const timersToSave = timers.map(timer => ({
         ...timer,
-        startTime: timer.startTime ? timer.startTime.toISOString() : null,
+        startTime: timer.startTime ? new Date(timer.startTime).toISOString() : null,
         currentTimeEntry: timer.currentTimeEntry ? {
           ...timer.currentTimeEntry,
-          start_time: timer.currentTimeEntry.start_time ? timer.currentTimeEntry.start_time.toISOString() : undefined,
-          end_time: timer.currentTimeEntry.end_time ? timer.currentTimeEntry.end_time.toISOString() : undefined,
+          start_time: timer.currentTimeEntry.start_time ? new Date(timer.currentTimeEntry.start_time).toISOString() : undefined,
+          end_time: timer.currentTimeEntry.end_time ? new Date(timer.currentTimeEntry.end_time).toISOString() : undefined,
         } : null
       }));
       

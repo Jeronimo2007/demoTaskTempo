@@ -210,6 +210,7 @@ export default function AdminPanel() {
       }
       return updatedState;
     });
+    console.log("NewTask.billing_type:", newTask.billing_type);
   };
 
   // Handler specifically for the inline editing fields
@@ -240,6 +241,7 @@ export default function AdminPanel() {
       return updatedState;
     });
   };
+  console.log("EditingTask.billing_type:", editingTask.billing_type);
 
 
   const handleCreateTask = async () => {
@@ -435,6 +437,7 @@ export default function AdminPanel() {
                     <th className="border-b border-black p-2 text-left">Fecha Entrega</th>
                     <th className="border-b border-black p-2 text-left">Área</th>
                     <th className="border-b border-black p-2 text-left">Facturación</th>
+                    <th className="border-b border-black p-2 text-left">Total Facturado</th>
                     <th className="border-b border-black p-2 text-left">Estado</th>
                     <th className="border-b border-black p-2 text-left">Nota</th>
                     <th className="p-2 text-left">Acciones</th>
@@ -463,6 +466,7 @@ export default function AdminPanel() {
                               <input type="number" name="total_value" placeholder="Valor Total" value={editingTask.total_value ?? ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black mt-1 text-sm" step="0.01" />
                             )}
                           </td>
+                          <td className="border-b border-black p-1 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString()}` : '-'}</td>
                           <td className="border-b border-black p-1">
                             <select name="status" value={editingTask.status || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm">
                               {TASK_STATUSES.map(status => (<option key={status.value} value={status.value}>{status.value}</option>))}
@@ -484,8 +488,10 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-2 text-sm">{task.title}</td>
                           <td className="border-b border-black p-2 text-sm">{task.client_name || task.client || 'N/A'}</td>
                           <td className="border-b border-black p-2 text-sm">{formatDate(task.due_date)}</td>
+                          
                           <td className="border-b border-black p-2 text-sm">{task.area || 'N/A'}</td>
-                          <td className="border-b border-black p-2 text-sm">{task.billing_type === 'percentage' ? `Porcentaje (${task.total_value ?? 'N/A'})` : 'Por Hora'}</td>
+                          <td className="border-b border-black p-2 text-sm">{task.billing_type === 'hourly' ? `Por Hora` : `Porcentaje (${task.total_value ?? 'N/A'})`}</td>
+                          <td className="border-b border-black p-2 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString()}` : '-'}</td>
                           <td className="border-b border-black p-2 text-sm"><span className={`inline-flex items-center justify-center px-2 py-1 text-xs font-bold rounded ${getStatusColor(task.status)} text-white`}>{task.status}</span></td>
                           <td className="border-b border-black p-2 text-sm">{task.note || '-'}</td>
                           <td className="p-2">
@@ -568,8 +574,9 @@ export default function AdminPanel() {
                   {AREA_OPTIONS.map(area => (<option key={area} value={area}>{area}</option>))}
                 </select>
                 <select name="billing_type" value={newTask.billing_type} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required>
-                  <option value="hourly">Por Hora</option>
+                  <option value="">Selecciona una opción</option>
                   <option value="percentage">Por Porcentaje</option>
+                  <option value="hourly">Por Hora</option>
                 </select>
                 {newTask.billing_type === 'percentage' && (
                   <input type="number" name="total_value" placeholder="Valor Total *" value={newTask.total_value ?? ''} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required={newTask.billing_type === 'percentage'} step="0.01" min="0.01" />

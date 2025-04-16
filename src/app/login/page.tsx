@@ -1,6 +1,6 @@
 'use client'
 import Image from 'next/image';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { loginUser } from "@/services/authService";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -13,9 +13,38 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    // Check for Google OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const userData = urlParams.get('user');
+    const error = urlParams.get('error');
 
+    console.log('Google Auth Callback - Full URL:', window.location.href);
+    console.log('Google Auth Callback - URL Params:', {
+      token: token ? 'present' : 'missing',
+      userData: userData ? 'present' : 'missing',
+      error: error || 'none'
+    });
 
- // Removed useEffect that handled Google Auth params, moved to layout.tsx
+    if (error) {
+      console.error('Google Auth Error:', error);
+      setError(`Error de autenticación: ${error}`);
+      return;
+    }
+
+    if (token && userData) {
+      try {
+        const user = JSON.parse(decodeURIComponent(userData));
+        console.log('Google Auth - Parsed User Data:', user);
+        setUser(user, token);
+        router.push("/lawspace");
+      } catch (err) {
+        console.error("Error processing Google auth callback:", err);
+        setError("Error al procesar la autenticación de Google");
+      }
+    }
+  }, [setUser, router]);
 
   const handleLogin = async () => {
     try {
@@ -31,7 +60,16 @@ export default function LoginPage() {
   const handleGoogleLogin = () => {
     // Redirect to the backend endpoint for Google OAuth using the API URL
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    window.location.href = `${apiUrl}/auth/google`;
+    const frontendUrl = window.location.origin;
+    const callbackUrl = `${frontendUrl}/login`;
+    
+    console.log('Initiating Google Login:', {
+      apiUrl,
+      frontendUrl,
+      callbackUrl
+    });
+    
+    window.location.href = `${apiUrl}/auth/google?callback_url=${encodeURIComponent(callbackUrl)}`;
   };
 
   return (

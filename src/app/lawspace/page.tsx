@@ -315,17 +315,65 @@ const Workspace: React.FC = () => {
 
   useEffect(() => {
     const checkAuthAndFetchData = async () => {
-      const token = getToken();
+      console.log('Starting authentication check...');
+      
+      // First check URL parameters for Google OAuth
+      const searchParams = new URLSearchParams(window.location.search);
+      const googleToken = searchParams.get('access_token');
+      const userId = searchParams.get('user_id');
+      const username = searchParams.get('username');
+      const role = searchParams.get('role');
 
+      console.log('Current URL:', window.location.href);
+      console.log('Google OAuth Params:', {
+        token: googleToken ? 'present' : 'missing',
+        userId: userId ? 'present' : 'missing',
+        username: username ? 'present' : 'missing',
+        role: role ? 'present' : 'missing'
+      });
+
+      if (googleToken && userId && username && role) {
+        console.log('Processing Google OAuth...');
+        try {
+          const user = {
+            id: userId,
+            username: username,
+            role: role
+          };
+          console.log('Setting user from Google OAuth:', user);
+          setUser(user, googleToken);
+          
+          // Set the token in cookies
+          document.cookie = `token=${googleToken}; path=/; max-age=86400`; // 24 hours
+          
+          window.history.replaceState({}, '', '/lawspace');
+          console.log('Fetching data with Google token...');
+          await fetchData(googleToken);
+          console.log('Google OAuth process completed successfully');
+          return;
+        } catch (err) {
+          console.error("Error processing Google auth callback:", err);
+          setError("Error al procesar la autenticación de Google");
+        }
+      }
+
+      // If no Google OAuth parameters, check cookie token
+      const token = getToken();
+      console.log('Cookie token:', token ? 'present' : 'missing');
+      
       if (!token) {
+        console.log('No token found, redirecting to login...');
         router.push('/login');
         return;
       }
 
       if (!user) {
+        console.log('No user in store, fetching user data...');
         try {
           const userData = await getUserData(token);
+          console.log('Fetched user data:', userData);
           if (!userData || !userData.id || !userData.role) {
+            console.error('Incomplete user data:', userData);
             setError('Error: Incomplete user information. Contact the administrator.');
             setIsLoading(false);
             return;
@@ -340,6 +388,7 @@ const Workspace: React.FC = () => {
       }
 
       if (!user.role) {
+        console.error('User role missing:', user);
         setError('Error: User role information not available. Contact the administrator.');
         setIsLoading(false);
         return;
@@ -347,6 +396,7 @@ const Workspace: React.FC = () => {
 
       // Only fetch data if we haven't already loaded it
       if (allTasks.length === 0 && timeEntries.length === 0) {
+        console.log('Fetching initial data...');
         fetchData(token);
       }
     };

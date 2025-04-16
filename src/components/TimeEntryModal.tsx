@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
 import { FaTimes, FaSave } from 'react-icons/fa';
-import { Task } from '@/types/task'; // Import the shared Task interface
+import { Task } from '@/types/task';
+import clientService from '@/services/clientService';
+import taskService from '@/services/taskService';
 
 interface TimeEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   start: Date;
   end: Date;
-  tasks: Task[];
   onSubmit: (data: { taskId: number; start: Date; end: Date; description: string }) => void;
   isCreating: boolean;
   error: string | null;
+}
+
+interface Client {
+  id: number;
+  name: string;
 }
 
 const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
@@ -19,31 +25,80 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
   onClose,
   start,
   end,
-  tasks,
   onSubmit,
   isCreating,
   error
 }) => {
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [startDate, setStartDate] = useState(start);
   const [endDate, setEndDate] = useState(end);
   const [description, setDescription] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
 
   useEffect(() => {
     // Reset form when modal opens
     setStartDate(start);
     setEndDate(end);
+    setSelectedClientId(null);
     setSelectedTaskId(null);
     setDescription('');
     setFormError(null);
+    setFilteredTasks([]);
   }, [isOpen, start, end]);
+
+  // Fetch clients when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoadingClients(true);
+      clientService.getAllClients()
+        .then(setClients)
+        .catch(err => {
+          console.error('Error fetching clients:', err);
+          setFormError('Error al cargar los clientes');
+        })
+        .finally(() => setIsLoadingClients(false));
+    }
+  }, [isOpen]);
+
+  // Update filtered tasks when client selection changes
+  useEffect(() => {
+    const fetchClientTasks = async () => {
+      if (selectedClientId) {
+        setIsLoadingTasks(true);
+        try {
+          const clientTasks = await taskService.getTasksByClient(selectedClientId);
+          setFilteredTasks(clientTasks);
+        } catch (err) {
+          console.error('Error fetching client tasks:', err);
+          setFormError('Error al cargar las tareas del cliente');
+          setFilteredTasks([]);
+        } finally {
+          setIsLoadingTasks(false);
+        }
+      } else {
+        setFilteredTasks([]);
+      }
+      setSelectedTaskId(null); // Reset task selection when client changes
+    };
+
+    fetchClientTasks();
+  }, [selectedClientId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
     // Validaciones
+    if (!selectedClientId) {
+      setFormError('Por favor, selecciona un cliente');
+      return;
+    }
+
     if (!selectedTaskId) {
       setFormError('Por favor, selecciona una tarea');
       return;
@@ -66,6 +121,12 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
   // Formatear fecha para input datetime-local
   const formatDateForInput = (date: Date) => {
     return moment(date).format('YYYY-MM-DDTHH:mm');
+  };
+
+  // Seleccionar cliente
+  const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setSelectedClientId(value ? Number(value) : null);
   };
 
   // Seleccionar tarea
@@ -113,6 +174,27 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-4">
           <div className="mb-4">
+            <label htmlFor="client" className="block text-sm font-medium text-gray-700 mb-1">
+              Cliente *
+            </label>
+            <select
+              id="client"
+              value={selectedClientId || ''}
+              onChange={handleClientSelect}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isCreating || isLoadingClients}
+              required
+            >
+              <option value="">Seleccionar cliente</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-4">
             <label htmlFor="task" className="block text-sm font-medium text-gray-700 mb-1">
               Tarea *
             </label>
@@ -121,16 +203,21 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
               value={selectedTaskId || ''}
               onChange={handleTaskSelect}
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={isCreating}
+              disabled={isCreating || !selectedClientId || isLoadingTasks}
               required
             >
               <option value="">Seleccionar tarea</option>
-              {tasks.map(task => (
+              {filteredTasks.map(task => (
                 <option key={task.id} value={task.id}>
-                  {task.title} - {task.client_name || `Cliente ${task.client_id}`}
+                  {task.title}
                 </option>
               ))}
             </select>
+            {isLoadingTasks && (
+              <div className="mt-2 text-sm text-gray-500">
+                Cargando tareas...
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
