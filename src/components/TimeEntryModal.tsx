@@ -10,6 +10,7 @@ interface TimeEntryModalProps {
   onClose: () => void;
   start: Date;
   end: Date;
+  tasks: Task[];
   onSubmit: (data: { taskId: number; start: Date; end: Date; description: string }) => void;
   isCreating: boolean;
   error: string | null;
