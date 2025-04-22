@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import moment from 'moment';
 import { FaTimes, FaTrash, FaEdit, FaSave, FaWindowClose } from 'react-icons/fa'; // Added icons
-import { TimeEntryResponse, timeEntryService } from '@/services/timeEntryService'; // Assuming update function will be here
+import { TimeEntryResponse } from '@/services/timeEntryService'; // Removed unused timeEntryService import
 import { Task } from '@/types/task';
 import { useAuthStore } from '@/store/useAuthStore';
 
 // Define the update payload structure based on the backend model
 interface TimeEntryUpdatePayload {
-  start_time?: string; // Use string for input compatibility
-  end_time?: string;
+  id: number;
   description?: string;
 }
 
@@ -40,23 +38,17 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
   const authUser = useAuthStore(state => state.user);
 
   // State for edited values
-  const [editedStartTime, setEditedStartTime] = useState('');
-  const [editedEndTime, setEditedEndTime] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
 
   // Function to format Date object to 'YYYY-MM-DDTHH:mm' for datetime-local input
-  const formatDateTimeLocal = (dateString: string): string => {
-    return moment(dateString).format('YYYY-MM-DDTHH:mm');
-  };
+
 
   // Initialize edit state when modal opens or timeEntry changes
   useEffect(() => {
     if (isOpen) {
-      setEditedStartTime(formatDateTimeLocal(timeEntry.start_time));
-      setEditedEndTime(formatDateTimeLocal(timeEntry.end_time));
       setEditedDescription(timeEntry.description || '');
-      setIsEditing(false); // Reset editing mode on open
-      setError(null); // Clear previous errors
+      setIsEditing(false);
+      setError(null);
     }
   }, [isOpen, timeEntry]);
 
@@ -79,29 +71,8 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Calculate duration
-  const calculateDuration = (start: string, end: string): string => {
-    const startTime = new Date(start).getTime();
-    const endTime = new Date(end).getTime();
-    if (isNaN(startTime) || isNaN(endTime) || endTime < startTime) {
-        return 'Duración inválida';
-    }
-    const duration = (endTime - startTime) / 1000;
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration % 3600) / 60);
-    return hours > 0
-      ? `${hours} horas y ${minutes} minutos`
-      : `${minutes} minutos`;
-  };
-
-  const durationString = calculateDuration(timeEntry.start_time, timeEntry.end_time);
-  const editedDurationString = calculateDuration(editedStartTime, editedEndTime);
-
-
   // Format dates for display
-  const formatDate = (dateString: string) => {
-    return moment(dateString).format('DD/MM/YYYY HH:mm');
-  };
+
 
   const handleDelete = async () => {
     if (!canDeleteEntry()) {
@@ -130,8 +101,6 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
       setError(null); // Clear errors when toggling edit mode
       // Reset edited values if cancelling edit
       if (isEditing) {
-        setEditedStartTime(formatDateTimeLocal(timeEntry.start_time));
-        setEditedEndTime(formatDateTimeLocal(timeEntry.end_time));
         setEditedDescription(timeEntry.description || '');
       }
     } else {
@@ -143,8 +112,6 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
     setIsEditing(false);
     setError(null);
     // Reset edited values
-    setEditedStartTime(formatDateTimeLocal(timeEntry.start_time));
-    setEditedEndTime(formatDateTimeLocal(timeEntry.end_time));
     setEditedDescription(timeEntry.description || '');
   };
 
@@ -155,33 +122,20 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
      }
 
      // Basic validation
-     if (!editedStartTime || !editedEndTime) {
-        setError('Las fechas de inicio y fin son requeridas.');
-        return;
-     }
-     if (new Date(editedEndTime) <= new Date(editedStartTime)) {
-        setError('La fecha de fin debe ser posterior a la fecha de inicio.');
-        return;
-     }
+
 
 
      setIsUpdating(true);
      setError(null);
 
-     const payload: TimeEntryUpdatePayload = {};
+     const payload: TimeEntryUpdatePayload = { id: timeEntry.id };
      // Only include fields if they have changed
-     if (formatDateTimeLocal(timeEntry.start_time) !== editedStartTime) {
-        payload.start_time = new Date(editedStartTime).toISOString();
-     }
-      if (formatDateTimeLocal(timeEntry.end_time) !== editedEndTime) {
-        payload.end_time = new Date(editedEndTime).toISOString();
-     }
      if (timeEntry.description !== editedDescription) {
         payload.description = editedDescription;
      }
 
      // If no changes, just exit edit mode
-     if (Object.keys(payload).length === 0) {
+     if (Object.keys(payload).length === 1 && payload.id === timeEntry.id) {
         setIsEditing(false);
         setIsUpdating(false);
         return;
@@ -191,6 +145,7 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
      try {
        await onUpdate(timeEntry.id, payload);
        setIsEditing(false); // Exit editing mode on success
+       onClose(); // Close modal on successful update
        // No need to call onClose here, let the parent handle refresh and potentially keep modal open if needed
      } catch (err) {
        console.error('Error al actualizar entrada de tiempo:', err);
@@ -237,32 +192,6 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
           <div className="space-y-3 text-sm text-gray-700">
             {isEditing ? (
               <>
-                {/* Edit Start Time */}
-                <div>
-                  <label htmlFor="edit-start-time" className="block font-medium mb-1">Inicio:</label>
-                  <input
-                    type="datetime-local"
-                    id="edit-start-time"
-                    value={editedStartTime}
-                    onChange={(e) => setEditedStartTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    disabled={isUpdating}
-                  />
-                </div>
-                {/* Edit End Time */}
-                <div>
-                  <label htmlFor="edit-end-time" className="block font-medium mb-1">Fin:</label>
-                  <input
-                    type="datetime-local"
-                    id="edit-end-time"
-                    value={editedEndTime}
-                    onChange={(e) => setEditedEndTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    disabled={isUpdating}
-                  />
-                </div>
-                 {/* Display Edited Duration */}
-                 <p><span className="font-medium">Duración Calculada:</span> {editedDurationString}</p>
                 {/* Edit Description */}
                 <div>
                   <label htmlFor="edit-description" className="block font-medium mb-1">Descripción:</label>
@@ -280,9 +209,6 @@ const TimeEntryDetailsModal: React.FC<TimeEntryDetailsModalProps> = ({
             ) : (
               <>
                 {/* Display Details */}
-                <p><span className="font-medium">Inicio:</span> {formatDate(timeEntry.start_time)}</p>
-                <p><span className="font-medium">Fin:</span> {formatDate(timeEntry.end_time)}</p>
-                <p><span className="font-medium">Duración:</span> {durationString}</p>
                 <p><span className="font-medium">Facturado:</span> {timeEntry.facturado ? 'Si' : 'No'}</p>
                 {timeEntry.description && (
                   <div className="mt-2">

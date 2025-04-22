@@ -43,11 +43,6 @@ const AREA_OPTIONS = [
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-// Utility function to normalize IDs for consistent comparison
-const stringifyId = (id: string | number | null | undefined): string => {
-  if (id === null || id === undefined) return '';
-  return String(id).trim();
-};
 
 // Define type for the newTask state explicitly
 type NewTaskState = {
@@ -374,10 +369,15 @@ export default function AdminPanel() {
 
   const filteredTasks = useMemo(() => {
     if (!clientFilter) return tasks;
-    return tasks.filter(task => task.client_name === clientFilter);
+    const searchTerm = clientFilter.toLowerCase();
+    return tasks.filter(task =>
+      task.title.toLowerCase().includes(searchTerm) ||
+      ((task.client_name || task.client) && (task.client_name || task.client)?.toString().toLowerCase().includes(searchTerm)) ||
+      (task.area && task.area.toLowerCase().includes(searchTerm))
+    );
   }, [tasks, clientFilter]);
 
-  const handleClientFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleClientFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setClientFilter(e.target.value);
     setCurrentTaskPage(1);
   };
@@ -412,10 +412,13 @@ export default function AdminPanel() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Gestión de Asuntos</h2>
               <div className="flex gap-4">
-                <select value={clientFilter} onChange={handleClientFilterChange} className="p-2 border rounded text-black">
-                  <option value="">Todos los Clientes</option>
-                  {clients.map(client => (<option key={client.id} value={client.id}>{client.name}</option>))}
-                </select>
+                <input
+                  type="text"
+                  placeholder="Buscar Cliente"
+                  value={clientFilter}
+                  onChange={handleClientFilterChange}
+                  className="p-2 border rounded text-black"
+                />
                 <button onClick={() => { setIsLoading(true); fetchTasks().finally(() => setIsLoading(false)); }} className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition" title="Actualizar lista de tareas">
                   <FontAwesomeIcon icon={faRotate} className="mr-2" /> Actualizar
                 </button>

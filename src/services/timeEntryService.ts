@@ -10,8 +10,6 @@ export interface TimeEntryCreate {
 }
 
 export interface TimeEntryUpdate {
-    start_time?: string;
-    end_time?: string;
     description?: string;
 }
 
@@ -36,14 +34,7 @@ const getToken = () => {
 
 // Updated date formatting function to match backend expected format
 const formatDateForAPI = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  return date.toISOString();
 };
 
 export const timeEntryService = {
@@ -126,25 +117,18 @@ export const timeEntryService = {
     },
 
     // Update a time entry
-    updateTimeEntry: async (entryId: number, updates: { start_time?: Date | string; end_time?: Date | string; description?: string }): Promise<TimeEntryResponse> => {
-        const token = getToken();
+    updateTimeEntry: async (entryId: number, updates: { id: number, description?: string }): Promise<TimeEntryResponse> => {
+        getToken();
         
         // Formateamos las fechas si existen
         const formattedUpdates: TimeEntryUpdate = {};
-        if (updates.start_time) {
-            formattedUpdates.start_time = updates.start_time instanceof Date ? formatDateForAPI(updates.start_time) : updates.start_time;
-        }
-        if (updates.end_time) {
-            formattedUpdates.end_time = updates.end_time instanceof Date ? formatDateForAPI(updates.end_time) : updates.end_time;
-        }
         if (updates.description !== undefined) {
             formattedUpdates.description = updates.description;
         }
         
         const response = await axios.put(
-            `${API_URL}/timeEntry/update/${entryId}`,
-            formattedUpdates,
-            { headers: { Authorization: `Bearer ${token}` } }
+            `${API_URL}/timeEntry/update`,
+            {id: entryId, ...formattedUpdates}
         );
         return response.data;
     },

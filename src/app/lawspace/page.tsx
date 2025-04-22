@@ -554,7 +554,7 @@ const Workspace: React.FC = () => {
   const handleTimeEntryUpdate = async (entryId: number, data: TimeEntryUpdate): Promise<void> => {
     try {
       console.log(`Attempting to update time entry ${entryId} with data:`, data);
-      await timeEntryService.updateTimeEntry(entryId, data);
+      await timeEntryService.updateTimeEntry(entryId, { id: entryId, description: data.description });
       console.log(`Time entry ${entryId} updated successfully.`);
 
       // Refresh entries after update
