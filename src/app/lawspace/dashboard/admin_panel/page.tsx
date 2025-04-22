@@ -374,8 +374,7 @@ export default function AdminPanel() {
 
   const filteredTasks = useMemo(() => {
     if (!clientFilter) return tasks;
-    const filterClientIdStr = stringifyId(clientFilter);
-    return tasks.filter(task => stringifyId(task.client_id) === filterClientIdStr);
+    return tasks.filter(task => task.client_name === clientFilter);
   }, [tasks, clientFilter]);
 
   const handleClientFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

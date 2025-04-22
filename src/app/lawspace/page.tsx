@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import TimeEntryCalendar from '@/components/Calendar';
-import timeEntryService, { TimeEntryResponse } from '@/services/timeEntryService';
+import timeEntryService, { TimeEntryResponse, TimeEntryUpdate } from '@/services/timeEntryService'; // Import TimeEntryUpdate
 import taskService from '@/services/taskService';
 import clientService from '@/services/clientService';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -195,7 +195,8 @@ const Workspace: React.FC = () => {
           clientName = task.client;
         } else if (clientId) {
           try {
-            clientName = await clientService.getClientName(clientId);
+            const client = await clientService.getClient(clientId);
+            clientName = client ? client.name : 'Cliente no asignado';
           } catch (err) {
             console.error(`Error getting client name for ID ${clientId}:`, err);
           }
@@ -255,7 +256,8 @@ const Workspace: React.FC = () => {
           clientName = task.client;
         } else if (clientId) {
           try {
-            clientName = await clientService.getClientName(clientId);
+            const client = await clientService.getClient(clientId);
+            clientName = client ? client.name : 'Cliente no asignado';
           } catch (err) {
             console.error(`Error getting client name for ID ${clientId}:`, err);
           }
@@ -431,7 +433,8 @@ const Workspace: React.FC = () => {
           clientName = task.client;
         } else if (clientId) {
           try {
-            clientName = await clientService.getClientName(clientId);
+            const client = await clientService.getClient(clientId);
+            clientName = client ? client.name : 'Cliente no asignado';
           } catch (err) {
             console.error(`Error getting client name for ID ${clientId}:`, err);
           }
@@ -546,6 +549,38 @@ const Workspace: React.FC = () => {
       throw error;
     }
   };
+
+  // Handler for updating a time entry
+  const handleTimeEntryUpdate = async (entryId: number, data: TimeEntryUpdate): Promise<void> => {
+    try {
+      console.log(`Attempting to update time entry ${entryId} with data:`, data);
+      await timeEntryService.updateTimeEntry(entryId, data);
+      console.log(`Time entry ${entryId} updated successfully.`);
+
+      // Refresh entries after update
+      // Determine the current date range shown in the calendar to refresh correctly
+      // For simplicity, we'll refresh the current week as handleRefreshTimeEntries does by default
+      // If the calendar component manages its own date range internally, this might need adjustment
+      // or the calendar component could expose its current range.
+      const currentDate = new Date();
+      const startDate = new Date(currentDate);
+      startDate.setDate(currentDate.getDate() - currentDate.getDay());
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = new Date(currentDate);
+      endDate.setDate(currentDate.getDate() + (6 - currentDate.getDay()));
+      endDate.setHours(23, 59, 59, 999);
+
+      await handleRefreshTimeEntries(startDate, endDate); // Refresh data
+
+    } catch (error) {
+      console.error('Error updating time entry:', error);
+      setError('Error al actualizar la entrada de tiempo en el servidor.');
+      // Re-throw the error if the modal needs to display it
+      throw error;
+    }
+  };
+
 
   const handleClientFilterChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     const clientValue = event.target.value;
@@ -719,6 +754,7 @@ const Workspace: React.FC = () => {
           isLoading={isLoadingEntries || isLoadingUsers || isLoadingClients}
           onRefresh={handleRefreshTimeEntries}
           onTimeEntryCreate={handleTimeEntryCreate}
+          onTimeEntryUpdate={handleTimeEntryUpdate} // Pass the update handler
           userMap={getUserName}
           currentUserId={user?.id ? Number(user.id) : undefined}
           userColorMap={userColorMap}

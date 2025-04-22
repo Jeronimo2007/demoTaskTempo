@@ -11,6 +11,14 @@ import TimeEntryDetailsModal from '@/components/TimeEntryDetailsModal';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Task } from '@/types/task'; // Import the shared Task interface
 
+// Define the update payload structure matching the modal
+interface TimeEntryUpdatePayload {
+  start_time?: string;
+  end_time?: string;
+  description?: string;
+}
+
+
 // Configurar moment para usar español
 moment.locale('es');
 
@@ -22,6 +30,7 @@ interface CalendarProps {
   isLoading: boolean;
   onRefresh: (startDate?: Date, endDate?: Date) => Promise<boolean>;
   onTimeEntryCreate: (entry: TimeEntry) => Promise<void>;
+  onTimeEntryUpdate: (entryId: number, data: TimeEntryUpdatePayload) => Promise<void>; // <-- Add this prop
   userMap: (userId: number) => string;
   currentUserId?: number;
   userColorMap: Record<number, string>;
@@ -66,6 +75,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
     isLoading = false,
     onRefresh,
     onTimeEntryCreate,
+    onTimeEntryUpdate, // <-- Destructure the new prop
     userMap: initialUserMap = {},
     currentUserId,
     userColorMap = {} // Default to empty object if not provided
@@ -209,11 +219,36 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
       await timeEntryService.deleteTimeEntry(entryId);
       
       // Refresh the current week's entries after deletion
-      fetchTimeEntriesForWeek(currentDate);
+      await fetchTimeEntriesForWeek(currentDate); // Use await here
+      handleCloseDetailsModal(); // Close modal after successful deletion
     } catch (error) {
+       console.error("Error deleting time entry:", error);
+       // Optionally show an error message to the user
+       // setError('Failed to delete time entry.'); // Example
+       throw error; // Re-throw if needed by caller or for modal error display
+    }
+  }, [currentDate, fetchTimeEntriesForWeek, handleCloseDetailsModal]); // Added handleCloseDetailsModal dependency
+
+
+  // Handler for updating a time entry <-- NEW HANDLER
+  const handleUpdateTimeEntry = useCallback(async (entryId: number, data: TimeEntryUpdatePayload) => {
+    if (!onTimeEntryUpdate) {
+        console.error("onTimeEntryUpdate prop is missing!");
+        throw new Error("Update function not provided."); // Prevent further execution
+    }
+    try {
+      await onTimeEntryUpdate(entryId, data);
+      // Refresh the current week's entries after update
+      await fetchTimeEntriesForWeek(currentDate); // Use await here
+      // Keep the modal open after update to show refreshed data, or close if preferred:
+      // handleCloseDetailsModal();
+    } catch (error) {
+      console.error("Error updating time entry:", error);
+      // Re-throw the error so the modal can display it
       throw error;
     }
-  }, [currentDate, fetchTimeEntriesForWeek]);
+  }, [onTimeEntryUpdate, currentDate, fetchTimeEntriesForWeek]); // Added dependencies
+
 
   // Handler for navigating to a different date
   const handleNavigate = useCallback(async (action: 'PREV' | 'NEXT' | 'TODAY') => {
@@ -563,6 +598,7 @@ const TimeEntryCalendar = forwardRef<CalendarRef, CalendarProps>((props, ref) =>
           task={selectedEvent.resource.task}
           creatorName={getUserName(selectedEvent.resource.entry.user_id)}
           onDelete={handleDeleteTimeEntry}
+          onUpdate={handleUpdateTimeEntry} // <-- Pass the new handler
         />
       )}
     </div>
