@@ -5,27 +5,27 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Interface matching backend TaskCreate model
 interface TaskCreatePayload {
-    client_id: number;
-    title: string;
-    billing_type: 'hourly' | 'percentage';
-    status: string;
-    area?: string | null;
-    note?: string | null;
-    total_value?: number | null;
+  client_id: number;
+  title: string;
+  billing_type: 'hourly' | 'percentage';
+  status: string;
+  area?: string | null;
+  note?: string | null;
+  total_value?: number | null;
+  due_date?: string | null;
 }
+
 
 // Interface matching backend TaskUpdate model
 interface TaskUpdatePayload {
     id: number; // Required by the backend model for update payload
     title?: string | null;
     status?: string | null;
-    due_date?: string | null; // Keep consistent with Task type? Backend model shows Optional[str]
     area?: string | null;
     billing_type?: 'hourly' | 'percentage' | null;
     note?: string | null;
     total_value?: number | null;
 }
-
 export interface AssignedTask {
   task_id: number;
   client_id: number;
@@ -105,22 +105,15 @@ export const taskService = {
   createTask: async (taskData: TaskCreatePayload): Promise<Task> => {
     const token = getToken();
     try {
-      // Construct payload matching TaskCreatePayload, ensuring only valid fields are sent
-      const payload: TaskCreatePayload = {
-          client_id: Number(taskData.client_id), // Ensure client_id is a number
-          title: taskData.title,
-          billing_type: taskData.billing_type,
-          status: taskData.status,
-          // Include optional fields only if they have a value (not undefined)
-          ...(taskData.area !== undefined && { area: taskData.area }),
-          ...(taskData.note !== undefined && { note: taskData.note }),
-          ...(taskData.total_value !== undefined && { total_value: taskData.total_value }),
-      };
-
-      const response = await axios.post<Task>( // Assuming backend returns the full Task object upon creation
+      const response = await axios.post<Task>(
         `${API_URL}/tasks/create`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        taskData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
       // Assuming response.data matches the updated Task interface
       return {

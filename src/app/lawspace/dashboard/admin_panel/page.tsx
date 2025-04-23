@@ -53,6 +53,7 @@ type NewTaskState = {
   area: string;
   note: string;
   total_value: number | null;
+  due_date: string;
 };
 
 
@@ -78,6 +79,7 @@ export default function AdminPanel() {
     area: "Sin área", // Default area
     note: "", // Optional note
     total_value: null, // Optional total value, initialize as null
+    due_date: "", // Add due_date
   });
 
   // Pagination states
@@ -172,6 +174,7 @@ export default function AdminPanel() {
       area: "Sin área",
       note: "",
       total_value: null,
+      due_date: "", // Add due_date
     });
     setTaskModal({ isOpen: true });
     setUpdateError(null);
@@ -249,7 +252,13 @@ export default function AdminPanel() {
         setUpdateError("Debe seleccionar un cliente"); return;
       }
       if (newTask.billing_type === 'percentage' && (newTask.total_value === null || newTask.total_value <= 0)) {
-        setUpdateError("El valor total (mayor que 0) es requerido para facturación por porcentaje"); return;
+        setUpdateError("El valor total (mayor que 0) es requerido para facturación por porcentaje");
+        return;
+      }
+
+      let isoDueDate = null;
+      if (newTask.due_date) {
+        isoDueDate = new Date(newTask.due_date).toISOString();
       }
 
       const payload = {
@@ -260,6 +269,7 @@ export default function AdminPanel() {
         area: newTask.area || "Sin área",
         note: newTask.note || null,
         total_value: newTask.billing_type === 'percentage' ? newTask.total_value : null,
+        due_date: isoDueDate, // Add due_date in ISO format
       };
 
       await taskService.createTask(payload);
@@ -583,6 +593,7 @@ export default function AdminPanel() {
                 {newTask.billing_type === 'percentage' && (
                   <input type="number" name="total_value" placeholder="Valor Total *" value={newTask.total_value ?? ''} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required={newTask.billing_type === 'percentage'} step="0.01" min="0.01" />
                 )}
+                <input type="date" name="due_date" placeholder="Fecha de Entrega" value={newTask.due_date} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" />
                 <textarea name="note" placeholder="Nota (opcional)" value={newTask.note} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-4 text-black" rows={3} />
                 <div className="flex justify-end gap-2">
                   <button onClick={closeTaskModal} className="px-4 py-2 bg-gray-300 rounded text-black">Cancelar</button>
