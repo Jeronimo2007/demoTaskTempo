@@ -605,7 +605,9 @@ export default function AdminPanel() {
                 )}
                 <input type="date" name="due_date" placeholder="Fecha de Entrega" value={newTask.due_date} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" />
                 <div className="flex items-center mb-2">
-                  <input type="checkbox" id="permanent" name="permanent" checked={newTask.permanent} onChange={(e: ChangeEvent<HTMLInputElement>) => handleNewTaskChange({ target: { name: 'permanent', value: e.target.checked.toString() } })} className="mr-2" />
+                  <input type="checkbox" id="permanent" name="permanent" checked={newTask.permanent} onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setNewTask({ ...newTask, permanent: e.target.checked });
+                  }} className="mr-2" />
                   <label htmlFor="permanent" className="text-black">Permanent</label>
                 </div>
                 <textarea name="note" placeholder="Nota (opcional)" value={newTask.note} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-4 text-black" rows={3} />
