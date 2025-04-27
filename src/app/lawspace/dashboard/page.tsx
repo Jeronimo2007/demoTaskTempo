@@ -624,7 +624,7 @@ export default function Dashboard() {
   // Loading state handled within ProtectedRoute wrapper
 
 
-  // Wrap the entire component return in ProtectedRoute
+  // Conditionally render based on user role
   return (
     <ProtectedRoute allowedRoles={['senior', 'socio']}>
       {isLoading ? (
@@ -692,7 +692,7 @@ export default function Dashboard() {
                 <tr className="bg-[#4901ce] text-white">
                   <th className="border border-black p-2 text-left">Cliente</th>
                   <th className="border border-black p-2 text-left">Horas Mensuales</th>
-                  <th className="border border-black p-2 text-left">Costo Total del Mes</th>
+                  
                 </tr>
               </thead>
               <tbody>
@@ -708,7 +708,7 @@ export default function Dashboard() {
                           <span className="whitespace-nowrap">{client.current_month_hours} / {client.monthly_hours} hrs</span>
                         </div>
                       </td>
-                      <td className="border border-black p-2">{formatCurrency(client.cost_current_month)}</td>
+                      
                     </tr>
                   ))
                 ) : (
@@ -737,31 +737,29 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+          {user?.role === 'socio' && (
+            <div className="p-6 mt-8 text-black bg-white rounded-lg shadow-lg">
+              <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">
+                Panel de Rentabilidad
+              </h1>
+              <Collapse defaultActiveKey={['1']}>
+                <Panel header="Resumen de Rentabilidad de SSL" key="1">
+                  <OfficeRentabilitySummary />
+                </Panel>
+                <Panel header="Coste por Hora de Abogados mensualmente" key="2">
+                  <LawyersCostVsHours />
+                </Panel>
+                <Panel header="Carga de Abogados por Semana / Mes" key="3">
+                  <LawyersWeeklyWorkload />
+                </Panel>
+                <Panel header="Contribuciones de Clientes" key="4">
+                  <ClientsContributions />
+                </Panel>
+              </Collapse>
+            </div>
+          )}
         </div>
       )}
-
-      {/* Rentability Panel Section - Only visible to socios */}
-      <ProtectedRoute allowedRoles={['socio']}>
-        <div className="p-6 mt-8 text-black bg-white rounded-lg shadow-lg">
-          <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">
-            Panel de Rentabilidad
-          </h1>
-          <Collapse defaultActiveKey={['1']}>
-            <Panel header="Resumen de Rentabilidad de SSL" key="1">
-              <OfficeRentabilitySummary />
-            </Panel>
-            <Panel header="Coste por Hora de Abogados mensualmente" key="2">
-              <LawyersCostVsHours />
-            </Panel>
-            <Panel header="Carga de Abogados por Semana / Mes" key="3">
-              <LawyersWeeklyWorkload />
-            </Panel>
-            <Panel header="Contribuciones de Clientes" key="4">
-              <ClientsContributions />
-            </Panel>
-          </Collapse>
-        </div>
-      </ProtectedRoute>
     </ProtectedRoute>
   );
 }

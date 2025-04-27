@@ -14,6 +14,7 @@ export interface Task {
   // Keep potentially redundant fields for now to avoid breaking changes elsewhere.
   client?: string;
   name: string;
+  permanent: boolean;
 }
 
 // Define an AssignedTask interface for task assignments

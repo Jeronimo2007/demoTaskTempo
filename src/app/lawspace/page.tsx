@@ -222,7 +222,15 @@ const Workspace: React.FC = () => {
         }));
 
       setAvailableClients(clientOptions);
-      setFilteredTasks(allTasksConverted);
+      
+      if (clientOptions.length > 0) {
+        const firstClient = clientOptions[0].id;
+        setSelectedClient(firstClient);
+        const clientTasks = allTasksConverted.filter(task => task.client === firstClient);
+        setFilteredTasks(clientTasks);
+      } else {
+        setFilteredTasks(allTasksConverted);
+      }
       setError(null);
     } catch (error) {
       console.error('Error fetching all tasks:', error);

@@ -54,6 +54,7 @@ type NewTaskState = {
   note: string;
   total_value: number | null;
   due_date: string;
+  permanent: boolean;
 };
 
 
@@ -79,7 +80,8 @@ export default function AdminPanel() {
     area: "Sin área", // Default area
     note: "", // Optional note
     total_value: null, // Optional total value, initialize as null
-    due_date: "", // Add due_date
+    due_date: "", // Add due_date 
+    permanent: false,
   });
 
   // Pagination states
@@ -175,6 +177,7 @@ export default function AdminPanel() {
       note: "",
       total_value: null,
       due_date: "", // Add due_date
+      permanent: false,
     });
     setTaskModal({ isOpen: true });
     setUpdateError(null);
@@ -198,9 +201,13 @@ export default function AdminPanel() {
     }
 
     setNewTask(prevState => {
+      let updatedValue: string | number | null | boolean = processedValue;
+      if (name === 'permanent') {
+        updatedValue = value === 'true';
+      }
       const updatedState = {
         ...prevState,
-        [name]: processedValue,
+        [name]: updatedValue,
       };
       // Reset total_value if billing_type changes to hourly
       if (name === 'billing_type' && value === 'hourly') {
@@ -270,6 +277,7 @@ export default function AdminPanel() {
         note: newTask.note || null,
         total_value: newTask.billing_type === 'percentage' ? newTask.total_value : null,
         due_date: isoDueDate, // Add due_date in ISO format
+        permanent: newTask.permanent,
       };
 
       await taskService.createTask(payload);
@@ -447,6 +455,7 @@ export default function AdminPanel() {
                     <th className="border-b border-black p-2 text-left">Título</th>
                     <th className="border-b border-black p-2 text-left">Cliente</th>
                     <th className="border-b border-black p-2 text-left">Fecha Entrega</th>
+                    <th className="border-b border-black p-2 text-left">Asesoria Permanente</th>
                     <th className="border-b border-black p-2 text-left">Área</th>
                     <th className="border-b border-black p-2 text-left">Facturación</th>
                     <th className="border-b border-black p-2 text-left">Total Facturado</th>
@@ -464,6 +473,7 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-1"><input type="text" name="title" value={editingTask.title || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
                           <td className="border-b border-black p-1 text-sm">{task.client_name || task.client || 'N/A'}</td>
                           <td className="border-b border-black p-1"><input type="date" name="due_date" value={formatDate(editingTask.due_date)} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
+                          <td className="border-b border-black p-1 text-sm">{task.permanent ? "Si" : "No"}</td>
                           <td className="border-b border-black p-1">
                             <select name="area" value={editingTask.area || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm">
                               {AREA_OPTIONS.map(area => (<option key={area} value={area}>{area}</option>))}
@@ -500,7 +510,7 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-2 text-sm">{task.title}</td>
                           <td className="border-b border-black p-2 text-sm">{task.client_name || task.client || 'N/A'}</td>
                           <td className="border-b border-black p-2 text-sm">{formatDate(task.due_date)}</td>
-                          
+                          <td className="border-b border-black p-2 text-sm">{task.permanent ? "Si" : "No"}</td>
                           <td className="border-b border-black p-2 text-sm">{task.area || 'N/A'}</td>
                           <td className="border-b border-black p-2 text-sm">{task.billing_type === 'hourly' ? `Por Hora` : `Porcentaje (${task.total_value ?? 'N/A'})`}</td>
                           <td className="border-b border-black p-2 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString()}` : '-'}</td>
@@ -577,7 +587,7 @@ export default function AdminPanel() {
                 <input type="text" name="title" placeholder="Título *" value={newTask.title} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required />
                 <select name="client_id" value={newTask.client_id} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required>
                   <option value="">Seleccionar Cliente *</option>
-                  {clients.map(client => (<option key={client.id} value={client.id}>{client.name}</option>))}
+                  {clients.map((client: ClientData) => (<option key={client.id} value={client.id}>{client.name}</option>))}
                 </select>
                 <select name="status" value={newTask.status} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required>
                   {TASK_STATUSES.map(status => (<option key={status.value} value={status.value}>{status.value}</option>))}
@@ -594,6 +604,10 @@ export default function AdminPanel() {
                   <input type="number" name="total_value" placeholder="Valor Total *" value={newTask.total_value ?? ''} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required={newTask.billing_type === 'percentage'} step="0.01" min="0.01" />
                 )}
                 <input type="date" name="due_date" placeholder="Fecha de Entrega" value={newTask.due_date} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" />
+                <div className="flex items-center mb-2">
+                  <input type="checkbox" id="permanent" name="permanent" checked={newTask.permanent} onChange={(e: ChangeEvent<HTMLInputElement>) => handleNewTaskChange({ target: { name: 'permanent', value: e.target.checked.toString() } })} className="mr-2" />
+                  <label htmlFor="permanent" className="text-black">Permanent</label>
+                </div>
                 <textarea name="note" placeholder="Nota (opcional)" value={newTask.note} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-4 text-black" rows={3} />
                 <div className="flex justify-end gap-2">
                   <button onClick={closeTaskModal} className="px-4 py-2 bg-gray-300 rounded text-black">Cancelar</button>
