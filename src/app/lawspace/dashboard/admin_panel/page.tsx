@@ -253,7 +253,7 @@ export default function AdminPanel() {
     try {
       setUpdateError(null);
       if (!newTask.title.trim()) {
-        setUpdateError("El título de la tarea no puede estar vacío"); return;
+        setUpdateError("El título de el asunto no puede estar vacío"); return;
       }
       if (!newTask.client_id) {
         setUpdateError("Debe seleccionar un cliente"); return;
@@ -284,10 +284,10 @@ export default function AdminPanel() {
       closeTaskModal();
       fetchTasks();
     } catch (error) {
-      console.error("Error al crear la tarea:", error);
+      console.error("Error al crear el asunto:", error);
       const errorMessage = axios.isAxiosError(error) && error.response?.data?.detail
         ? `Error: ${error.response.data.detail}`
-        : "Error al crear la tarea. Verifique los datos e intente nuevamente.";
+        : "Error al crear el asunto. Verifique los datos e intente nuevamente.";
       setUpdateError(errorMessage);
     }
   };
@@ -347,17 +347,17 @@ export default function AdminPanel() {
       setEditingTaskId(null);
       setEditingTask({});
     } catch (error) {
-      console.error("Error al actualizar la tarea:", error);
+      console.error("Error al actualizar el asunto:", error);
       const errorMessage = axios.isAxiosError(error) && error.response?.data?.detail
         ? `Error: ${error.response.data.detail}`
-        : "Error al actualizar la tarea. Verifique los datos e intente nuevamente.";
+        : "Error al actualizar el asunto. Verifique los datos e intente nuevamente.";
       setUpdateError(errorMessage);
     }
   };
 
 
   const handleDeleteTask = async (taskId: number) => {
-    const isConfirmed = window.confirm("¿Está seguro que desea eliminar esta tarea?");
+    const isConfirmed = window.confirm("¿Está seguro que desea eliminar el asunto?");
     if (!isConfirmed) return;
 
     try {
@@ -365,10 +365,10 @@ export default function AdminPanel() {
       await taskService.deleteTask(taskId);
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
     } catch (error) {
-      console.error("Error al eliminar la tarea:", error);
+      console.error("Error al eliminar el asunto:", error);
       const errorMessage = axios.isAxiosError(error) && error.response?.data?.detail
         ? `Error: ${error.response.data.detail}`
-        : "Error al eliminar la tarea.";
+        : "Error al eliminar el asunto.";
       setUpdateError(errorMessage);
     }
   };
@@ -437,7 +437,7 @@ export default function AdminPanel() {
                   onChange={handleClientFilterChange}
                   className="p-2 border rounded text-black"
                 />
-                <button onClick={() => { setIsLoading(true); fetchTasks().finally(() => setIsLoading(false)); }} className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition" title="Actualizar lista de tareas">
+                <button onClick={() => { setIsLoading(true); fetchTasks().finally(() => setIsLoading(false)); }} className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition" title="Actualizar lista de asuntos">
                   <FontAwesomeIcon icon={faRotate} className="mr-2" /> Actualizar
                 </button>
                 <button onClick={openTaskModal} className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
@@ -582,7 +582,7 @@ export default function AdminPanel() {
           {taskModal.isOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
               <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-                <h3 className="text-lg font-semibold mb-4 text-black">Crear Nueva Tarea</h3>
+                <h3 className="text-lg font-semibold mb-4 text-black">Crear Nuevo Asunto</h3>
                 {updateError && <p className="text-red-500 mb-4">{updateError}</p>}
                 <input type="text" name="title" placeholder="Título *" value={newTask.title} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required />
                 <select name="client_id" value={newTask.client_id} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required>
@@ -613,7 +613,7 @@ export default function AdminPanel() {
                 <textarea name="note" placeholder="Nota (opcional)" value={newTask.note} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-4 text-black" rows={3} />
                 <div className="flex justify-end gap-2">
                   <button onClick={closeTaskModal} className="px-4 py-2 bg-gray-300 rounded text-black">Cancelar</button>
-                  <button onClick={handleCreateTask} className="px-4 py-2 bg-blue-600 text-white rounded">Crear Tarea</button>
+                  <button onClick={handleCreateTask} className="px-4 py-2 bg-blue-600 text-white rounded">Crear Asunto</button>
                 </div>
               </div>
             </div>
