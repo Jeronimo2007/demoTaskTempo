@@ -452,8 +452,8 @@ export default function AdminPanel() {
               <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="border-b border-black p-2 text-left">Título</th>
                     <th className="border-b border-black p-2 text-left">Cliente</th>
+                    <th className="border-b border-black p-2 text-left">Título</th>
                     <th className="border-b border-black p-2 text-left">Fecha Entrega</th>
                     <th className="border-b border-black p-2 text-left">Asesoria Permanente</th>
                     <th className="border-b border-black p-2 text-left">Área</th>
@@ -470,8 +470,8 @@ export default function AdminPanel() {
                       {editingTaskId === task.id ? (
                         <>
                           {/* Inline Editing Fields */}
-                          <td className="border-b border-black p-1"><input type="text" name="title" value={editingTask.title || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
                           <td className="border-b border-black p-1 text-sm">{task.client_name || task.client || 'N/A'}</td>
+                          <td className="border-b border-black p-1"><input type="text" name="title" value={editingTask.title || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
                           <td className="border-b border-black p-1"><input type="date" name="due_date" value={formatDate(editingTask.due_date)} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
                           <td className="border-b border-black p-1 text-sm">{task.permanent ? "Si" : "No"}</td>
                           <td className="border-b border-black p-1">
@@ -488,7 +488,7 @@ export default function AdminPanel() {
                               <input type="number" name="total_value" placeholder="Valor Total" value={editingTask.total_value ?? ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black mt-1 text-sm" step="0.01" />
                             )}
                           </td>
-                          <td className="border-b border-black p-1 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString()}` : '-'}</td>
+                          <td className="border-b border-black p-1 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '-'}</td>
                           <td className="border-b border-black p-1">
                             <select name="status" value={editingTask.status || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm">
                               {TASK_STATUSES.map(status => (<option key={status.value} value={status.value}>{status.value}</option>))}
@@ -507,13 +507,13 @@ export default function AdminPanel() {
                       ) : (
                         <>
                           {/* Display Fields */}
-                          <td className="border-b border-black p-2 text-sm">{task.title}</td>
                           <td className="border-b border-black p-2 text-sm">{task.client_name || task.client || 'N/A'}</td>
+                          <td className="border-b border-black p-2 text-sm">{task.title}</td>
                           <td className="border-b border-black p-2 text-sm">{formatDate(task.due_date)}</td>
                           <td className="border-b border-black p-2 text-sm">{task.permanent ? "Si" : "No"}</td>
                           <td className="border-b border-black p-2 text-sm">{task.area || 'N/A'}</td>
-                          <td className="border-b border-black p-2 text-sm">{task.billing_type === 'hourly' ? `Por Hora` : `Porcentaje (${task.total_value ?? 'N/A'})`}</td>
-                          <td className="border-b border-black p-2 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString()}` : '-'}</td>
+                          <td className="border-b border-black p-2 text-sm">{task.billing_type === 'hourly' ? `Por Hora` : `Porcentaje (${task.total_value ? task.total_value.toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'N/A'})`}</td>
+                          <td className="border-b border-black p-2 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '-'}</td>
                           <td className="border-b border-black p-2 text-sm"><span className={`inline-flex items-center justify-center px-2 py-1 text-xs font-bold rounded ${getStatusColor(task.status)} text-white`}>{task.status}</span></td>
                           <td className="border-b border-black p-2 text-sm">{task.note || '-'}</td>
                           <td className="p-2">

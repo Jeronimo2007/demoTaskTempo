@@ -94,7 +94,7 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
       return;
     }
     if (!selectedTaskId) {
-      alert('Por favor selecciona una tarea');
+      alert('Por favor selecciona un asunto');
       return;
     }
     if (!startDate || !endDate) {
@@ -131,7 +131,7 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
           className={`px-4 py-2 rounded-t ${activeTab === 'task' ? 'bg-purple-800 text-white' : 'bg-gray-200 text-gray-700'}`}
           onClick={() => setActiveTab('task')}
         >
-          Tarea
+          Asunto
         </button>
       </div>
       {/* Tab Content */}
@@ -234,12 +234,12 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
               >
                 <option value="">
                   {taskTabLoadingTasks
-                    ? 'Cargando tareas...'
+                    ? 'Cargando asuntos...'
                     : !taskTabClientId
                       ? 'Selecciona un cliente primero'
                       : taskTabAvailableTasks.length === 0
-                        ? 'No hay tareas para este cliente'
-                        : 'Selecciona una tarea'}
+                        ? 'No hay asuntos para este cliente'
+                        : 'Selecciona un asunto'}
                 </option>
                 {taskTabAvailableTasks.map(task => (
                   <option key={task.id} value={task.id}>
@@ -271,7 +271,7 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
               onClick={handleDownloadTaskReport}
               className="bg-purple-800 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
             >
-              Descargar Reporte de Tarea
+              Descargar Reporte de Asunto
             </button>
           </>
         )}
