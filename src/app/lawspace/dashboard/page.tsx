@@ -1,5 +1,5 @@
 "use client";
-import { Table, Collapse } from "antd";
+import { Table, Collapse, Select, DatePicker as AntDatePicker, Space } from "antd";
 
 import { useRouter } from "next/navigation";
 // import { useAuthStore } from "@/store/useAuthStore"; // Remove useAuthStore
@@ -7,13 +7,14 @@ import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import { addDays, subYears } from "date-fns";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 
 const { Panel } = Collapse;
 
@@ -462,6 +463,305 @@ const ClientsContributions = () => {
 };
 // --- End Rentability Panel Section ---
 
+interface Task {
+  id: number;
+  title: string;
+  status: string;
+  due_date: string;
+  client: string;
+  area: string;
+  billing_type: string;
+  note: string | null;
+  total_value: number | null;
+  total_billed: number;
+  permanent: boolean;
+}
+
+interface TaskTimeEntry {
+  abogado: string;
+  cargo: string;
+  cliente: string;
+  trabajo: string;
+  fecha_trabajo: string;
+  tiempo_trabajado: string;
+  tarifa_horaria: number;
+  moneda: string;
+  total: number;
+  facturado: string;
+}
+
+interface Client {
+  id: number;
+  name: string;
+  color: string | null;
+  total_time: number;
+  monthly_limit_hours: number;
+  current_month_hours: number;
+  permanent: boolean;
+  porcentaje_facturado: number | null;
+  total_facturado: number | null;
+  active: boolean;
+  city: string;
+  phone: string;
+  nit: string;
+  email: string;
+  address: string;
+}
+
+const TaskTimeEntries = () => {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [timeEntries, setTimeEntries] = useState<TaskTimeEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<number | null>(null);
+  const [selectedTask, setSelectedTask] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<Dayjs>(dayjs().subtract(1, 'year'));
+  const [endDate, setEndDate] = useState<Dayjs>(dayjs().add(1, 'day'));
+  const [facturado, setFacturado] = useState<"si" | "no" | "parcialmente">("no");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
+  const getToken = useCallback(() => {
+    const localToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (localToken) return localToken;
+    const cookieToken = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${TOKEN_KEY}=`))
+      ?.split("=")[1];
+    if (cookieToken) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, cookieToken);
+    }
+    return cookieToken || "";
+  }, []);
+
+  // Fetch clients
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const token = getToken();
+        const response = await axios.get(`${API_URL}/clients/get_clients_admin`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setClients(response.data);
+      } catch (error) {
+        console.error("Error fetching clients:", error);
+      }
+    };
+    fetchClients();
+  }, [getToken]);
+
+  // Fetch tasks when client is selected
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!selectedClient) {
+        setTasks([]);
+        return;
+      }
+      try {
+        const token = getToken();
+        const response = await axios.get(`${API_URL}/tasks/get_tasks_by_client`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { client_id: selectedClient }
+        });
+        setTasks(response.data);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        setTasks([]);
+      }
+    };
+    fetchTasks();
+  }, [selectedClient, getToken]);
+
+  // Reset task selection when client changes
+  useEffect(() => {
+    setSelectedTask(null);
+  }, [selectedClient]);
+
+  const fetchTimeEntries = async () => {
+    if (!selectedTask) return;
+    
+    try {
+      setLoading(true);
+      const token = getToken();
+      const response = await axios.post(
+        `${API_URL}/reports/task_time_entries`,
+        {
+          task_id: selectedTask,
+          start_date: startDate.format("YYYY-MM-DD"),
+          end_date: endDate.format("YYYY-MM-DD"),
+          facturado: facturado
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setTimeEntries(response.data);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      setTimeEntries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedTask) {
+      fetchTimeEntries();
+    } else {
+      setTimeEntries([]);
+    }
+  }, [selectedTask, startDate, endDate, facturado]);
+
+  const columns = [
+    {
+      title: 'Abogado',
+      dataIndex: 'abogado',
+      key: 'abogado',
+    },
+    {
+      title: 'Cargo',
+      dataIndex: 'cargo',
+      key: 'cargo',
+      render: (cargo: string) => cargo.charAt(0).toUpperCase() + cargo.slice(1),
+    },
+    {
+      title: 'Cliente',
+      dataIndex: 'cliente',
+      key: 'cliente',
+    },
+    {
+      title: 'Trabajo',
+      dataIndex: 'trabajo',
+      key: 'trabajo',
+    },
+    {
+      title: 'Fecha',
+      dataIndex: 'fecha_trabajo',
+      key: 'fecha_trabajo',
+    },
+    {
+      title: 'Tiempo',
+      dataIndex: 'tiempo_trabajado',
+      key: 'tiempo_trabajado',
+    },
+    {
+      title: 'Tarifa',
+      dataIndex: 'tarifa_horaria',
+      key: 'tarifa_horaria',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+      }).format(value),
+    },
+    {
+      title: 'Total',
+      dataIndex: 'total',
+      key: 'total',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+      }).format(value),
+    },
+    {
+      title: 'Facturado',
+      dataIndex: 'facturado',
+      key: 'facturado',
+      render: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+    },
+  ];
+
+  // Sort time entries by date (most recent first)
+  const sortedTimeEntries = [...timeEntries].sort((a, b) => {
+    return new Date(b.fecha_trabajo).getTime() - new Date(a.fecha_trabajo).getTime();
+  });
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+      <h2 className="text-lg font-semibold mb-4">Registro de Tiempo por Asunto</h2>
+      
+      <div className="flex gap-4 mb-4">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-black mb-1">Cliente</label>
+          <Select
+            className="w-full"
+            placeholder="Seleccione un cliente"
+            value={selectedClient}
+            onChange={setSelectedClient}
+            options={clients.map(client => ({
+              value: client.id,
+              label: client.name
+            }))}
+          />
+        </div>
+
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-black mb-1">Asunto</label>
+          <Select
+            className="w-full"
+            placeholder="Seleccione un Asunto"
+            value={selectedTask}
+            onChange={setSelectedTask}
+            options={tasks.map(task => ({
+              value: task.id,
+              label: task.title
+            }))}
+            disabled={!selectedClient}
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-black mb-1">Fecha Inicio</label>
+          <AntDatePicker
+            value={startDate}
+            onChange={(date) => date && setStartDate(date)}
+            className="w-full"
+            format="YYYY-MM-DD"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-black mb-1">Fecha Fin</label>
+          <AntDatePicker
+            value={endDate}
+            onChange={(date) => date && setEndDate(date)}
+            className="w-full"
+            format="YYYY-MM-DD"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-black mb-1">Facturado</label>
+          <Select
+            className="w-full"
+            value={facturado}
+            onChange={setFacturado}
+            options={[
+              { value: 'si', label: 'Sí' },
+              { value: 'no', label: 'No' },
+              { value: 'parcialmente', label: 'Parcialmente' }
+            ]}
+          />
+        </div>
+      </div>
+
+      <Table
+        columns={columns}
+        dataSource={sortedTimeEntries}
+        rowKey={(record) => `${record.abogado}-${record.fecha_trabajo}-${record.tiempo_trabajado}`}
+        loading={loading}
+        pagination={{
+          current: currentPage,
+          pageSize: pageSize,
+          total: sortedTimeEntries.length,
+          onChange: (page) => setCurrentPage(page),
+          showSizeChanger: false
+        }}
+      />
+    </div>
+  );
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -471,8 +771,8 @@ export default function Dashboard() {
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummaryData[]>([]);
-  const [startDate, setStartDate] = useState(subYears(new Date(), 1));
-  const [endDate, setEndDate] = useState(addDays(new Date(), 1));
+  const [startDate, setStartDate] = useState<Dayjs>(dayjs().subtract(1, 'year'));
+  const [endDate, setEndDate] = useState<Dayjs>(dayjs().add(1, 'day'));
   const currentMonth = new Date().toLocaleString('es-ES', { month: 'long' });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -512,14 +812,11 @@ export default function Dashboard() {
         return;
       }
 
-      const formattedStartDate = format(startDate, "yyyy-MM-dd");
-      const formattedEndDate = format(endDate, "yyyy-MM-dd");
-
       const response = await axios.post(
         `${API_URL}/reports/hours_by_client/`,
         {
-          start_date: formattedStartDate,
-          end_date: formattedEndDate,
+          start_date: startDate.format("YYYY-MM-DD"),
+          end_date: endDate.format("YYYY-MM-DD"),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -623,6 +920,14 @@ export default function Dashboard() {
 
   // Loading state handled within ProtectedRoute wrapper
 
+  const [chartPage, setChartPage] = useState(1);
+  const chartPageSize = 5;
+
+  // Calculate paginated data for the chart
+  const paginatedReportData = reportData.slice(
+    (chartPage - 1) * chartPageSize,
+    chartPage * chartPageSize
+  );
 
   // Conditionally render based on user role
   return (
@@ -638,30 +943,51 @@ export default function Dashboard() {
           {/* Selector de Fecha */}
           <div className="flex gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-black">Fecha Inicio:</label>
-              <DatePicker
-                selected={startDate}
+              <label className="block text-sm font-bold text-black">Fecha Inicio:</label>
+              <AntDatePicker
+                value={startDate}
                 onChange={(date) => date && setStartDate(date)}
                 className="mt-1 p-2 border rounded w-full text-black"
-                dateFormat="yyyy-MM-dd"
+                format="YYYY-MM-DD"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-black">Fecha Fin:</label>
-              <DatePicker
-                selected={endDate}
+              <label className="block text-sm font-bold text-black">Fecha Fin:</label>
+              <AntDatePicker
+                value={endDate}
                 onChange={(date) => date && setEndDate(date)}
                 className="mt-1 p-2 border rounded w-full text-black"
-                dateFormat="yyyy-MM-dd"
+                format="YYYY-MM-DD"
               />
             </div>
           </div>
 
-          {/* Single chart */}
+          {/* Single chart with pagination */}
           <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
-            <h2 className="text-lg font-semibold mb-3">Horas Trabajadas por Cliente</h2>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-semibold">Horas Trabajadas por Cliente</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setChartPage(prev => Math.max(prev - 1, 1))}
+                  disabled={chartPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                >
+                  Anterior
+                </button>
+                <span className="text-gray-700">
+                  Página {chartPage} de {Math.ceil(reportData.length / chartPageSize)}
+                </span>
+                <button
+                  onClick={() => setChartPage(prev => Math.min(prev + 1, Math.ceil(reportData.length / chartPageSize)))}
+                  disabled={chartPage >= Math.ceil(reportData.length / chartPageSize)}
+                  className="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={reportData} layout="vertical">
+              <BarChart data={paginatedReportData} layout="vertical">
                 <XAxis type="number" />
                 <YAxis dataKey="Cliente" type="category" width={150} />
                 <Tooltip />
@@ -669,6 +995,9 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Task Time Entries Table */}
+          <TaskTimeEntries />
 
           {/* Asesoría Permanente Section */}
           <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">

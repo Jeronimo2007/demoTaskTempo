@@ -24,16 +24,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user, token) => {
     console.log('Setting user in auth store:', { user, token: token ? 'present' : 'missing' });
     
+    // Ensure role is lowercase
+    const normalizedUser = {
+      ...user,
+      role: user.role.toLowerCase()
+    };
+    
     // Clear existing data first
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     
     // Store new user and token in localStorage
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
     localStorage.setItem('token', token);
     
     // Update store state
-    set({ user, token });
+    set({ user: normalizedUser, token });
   },
   logout: () => {
     console.log('Logging out - Clearing auth store');
