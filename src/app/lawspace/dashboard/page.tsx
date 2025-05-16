@@ -1,18 +1,15 @@
 "use client";
-import { Table, Collapse, Select, DatePicker as AntDatePicker, Space } from "antd";
+import { Table, Collapse, Select, DatePicker as AntDatePicker } from "antd";
 
 import { useRouter } from "next/navigation";
-// import { useAuthStore } from "@/store/useAuthStore"; // Remove useAuthStore
-import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import "react-datepicker/dist/react-datepicker.css";
-import { format } from "date-fns";
-import { addDays, subYears } from "date-fns";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
-import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
+import ProtectedRoute from "@/components/ProtectedRoute";
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 
@@ -577,7 +574,7 @@ const TaskTimeEntries = () => {
     setSelectedTask(null);
   }, [selectedClient]);
 
-  const fetchTimeEntries = async () => {
+  const fetchTimeEntries = useCallback(async () => {
     if (!selectedTask) return;
     
     try {
@@ -602,7 +599,7 @@ const TaskTimeEntries = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTask, startDate, endDate, facturado, getToken]);
 
   useEffect(() => {
     if (selectedTask) {
@@ -610,7 +607,7 @@ const TaskTimeEntries = () => {
     } else {
       setTimeEntries([]);
     }
-  }, [selectedTask, startDate, endDate, facturado]);
+  }, [selectedTask, fetchTimeEntries]);
 
   const columns = [
     {
@@ -766,8 +763,7 @@ const TaskTimeEntries = () => {
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Dashboard() {
-  // const { user } = useAuthStore(); // Remove useAuthStore usage
-  const { user, isAuthenticated, logout } = useAuth(); // Use useAuth hook
+  const { user, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [clientSummary, setClientSummary] = useState<ClientSummaryData[]>([]);
