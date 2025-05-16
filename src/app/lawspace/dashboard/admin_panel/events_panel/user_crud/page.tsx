@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Button, Table, Modal, Form, Input, Space, Popconfirm, message, Switch } from 'antd';
+import { Button, Table, Modal, Form, Input, Space, Popconfirm, message, Switch, Select } from 'antd';
 import { FaPlus, FaEdit, FaTrash, FaUser } from 'react-icons/fa';
 import axios from 'axios';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -46,6 +46,14 @@ const UserCrudPage: React.FC = () => {
   const [form] = Form.useForm();
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const { isAuthenticated, logout } = useAuth();
+
+  const roles = [
+    { value: 'socio', label: 'Socio' },
+    { value: 'senior', label: 'Senior' },
+    { value: 'junior', label: 'Junior' },
+    { value: 'consultor', label: 'Consultor' },
+    { value: 'auxiliar', label: 'Auxiliar' },
+  ];
 
   // Get token from cookies
   const getToken = (): string => {
@@ -224,6 +232,7 @@ const UserCrudPage: React.FC = () => {
       dataIndex: 'role',
       key: 'role',
       className: 'text-black',
+      render: (role: string) => role.charAt(0).toUpperCase() + role.slice(1),
     },
     {
       title: 'Salario',
@@ -370,9 +379,13 @@ const UserCrudPage: React.FC = () => {
             <Form.Item
               name="role"
               label={<span className="text-black">Rol</span>}
-              rules={[{ required: true, message: 'Por favor ingrese un rol' }]}
+              rules={[{ required: true, message: 'Por favor seleccione un rol' }]}
             >
-              <Input placeholder="Rol" className="text-black" />
+              <Select
+                placeholder="Seleccione un rol"
+                options={roles}
+                className="text-black"
+              />
             </Form.Item>
 
             <Form.Item
@@ -476,9 +489,13 @@ const UserCrudPage: React.FC = () => {
             <Form.Item
               name="role"
               label={<span className="text-black">Rol</span>}
-              rules={[{ required: true, message: 'Por favor ingrese un rol' }]}
+              rules={[{ required: true, message: 'Por favor seleccione un rol' }]}
             >
-              <Input placeholder="Rol" className="text-black" />
+              <Select
+                placeholder="Seleccione un rol"
+                options={roles}
+                className="text-black"
+              />
             </Form.Item>
 
             <Form.Item
