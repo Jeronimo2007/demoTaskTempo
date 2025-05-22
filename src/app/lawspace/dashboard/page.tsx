@@ -109,21 +109,42 @@ const OfficeRentabilitySummary = () => {
       title: 'Total Salarios',
       dataIndex: 'total_salarios',
       key: 'total_salarios',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Total Horas Trabajadas',
       dataIndex: 'total_horas_trabajadas',
       key: 'total_horas_trabajadas',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Total Ingresos',
       dataIndex: 'total_ingresos',
       key: 'total_ingresos',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Rentabilidad Oficina',
       dataIndex: 'rentabilidad_oficina',
       key: 'rentabilidad_oficina',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'percent',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value / 100),
     },
   ];
 
@@ -177,31 +198,65 @@ const LawyersCostVsHours = () => {
       title: 'Salario',
       dataIndex: 'salary',
       key: 'salary',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Horas Trabajadas',
       dataIndex: 'worked_hours',
       key: 'worked_hours',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Coste por Hora (Firma)',
       dataIndex: 'cost_per_hour_firma',
       key: 'cost_per_hour_firma',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Coste por Hora (Cliente)',
       dataIndex: 'cost_per_hour_client',
       key: 'cost_per_hour_client',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Ingresos Generados',
       dataIndex: 'ingresos_generados',
       key: 'ingresos_generados',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Utilidad por Hora',
       dataIndex: 'utilidad_por_hora',
       key: 'utilidad_por_hora',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
   ];
 
@@ -256,11 +311,19 @@ const LawyersWeeklyWorkload = () => {
       title: 'Horas Trabajadas Esta Semana',
       dataIndex: 'worked_hours_this_week',
       key: 'worked_hours_this_week',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Horas Esperadas Esta Semana',
       dataIndex: 'weekly_hours_expected',
       key: 'weekly_hours_expected',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
   ];
 
@@ -274,11 +337,19 @@ const LawyersWeeklyWorkload = () => {
       title: 'Horas Trabajadas Este Mes',
       dataIndex: 'worked_hours_this_month',
       key: 'worked_hours_this_month',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Horas Esperadas Este Mes',
       dataIndex: 'monthly_hours_expected',
       key: 'monthly_hours_expected',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
   ];
 
@@ -381,6 +452,10 @@ const ClientsContributions = () => {
       title: 'Total Horas',
       dataIndex: 'total_hours',
       key: 'total_hours',
+      render: (value: number) => new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value),
     },
     {
       title: 'Contribuciones',
@@ -397,11 +472,20 @@ const ClientsContributions = () => {
               title: 'Horas Trabajadas',
               dataIndex: 'worked_hours',
               key: 'worked_hours',
+              render: (value: number) => new Intl.NumberFormat('es-CO', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              }).format(value),
             },
             {
               title: 'Porcentaje de Contribución',
               dataIndex: 'porcentaje_contribucion',
               key: 'porcentaje_contribucion',
+              render: (value: number) => new Intl.NumberFormat('es-CO', {
+                style: 'percent',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              }).format(value / 100),
             },
           ]}
           dataSource={record.contributions}
@@ -580,13 +664,15 @@ const TaskTimeEntries = () => {
     try {
       setLoading(true);
       const token = getToken();
+      // Normalize facturado value to remove accents
+      const normalizedFacturado = facturado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const response = await axios.post(
         `${API_URL}/reports/task_time_entries`,
         {
           task_id: selectedTask,
           start_date: startDate.format("YYYY-MM-DD"),
           end_date: endDate.format("YYYY-MM-DD"),
-          facturado: facturado
+          facturado: normalizedFacturado
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -640,6 +726,13 @@ const TaskTimeEntries = () => {
       title: 'Tiempo',
       dataIndex: 'tiempo_trabajado',
       key: 'tiempo_trabajado',
+      render: (value: string) => {
+        const [hours, minutes] = value.split(':').map(Number);
+        return `${new Intl.NumberFormat('es-CO', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(hours)}:${minutes.toString().padStart(2, '0')}`;
+      },
     },
     {
       title: 'Tarifa',
@@ -648,7 +741,8 @@ const TaskTimeEntries = () => {
       render: (value: number) => new Intl.NumberFormat('es-CO', {
         style: 'currency',
         currency: 'COP',
-        minimumFractionDigits: 0
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
       }).format(value),
     },
     {
@@ -658,7 +752,8 @@ const TaskTimeEntries = () => {
       render: (value: number) => new Intl.NumberFormat('es-CO', {
         style: 'currency',
         currency: 'COP',
-        minimumFractionDigits: 0
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
       }).format(value),
     },
     {
@@ -1030,7 +1125,15 @@ export default function Dashboard() {
                           <div className="w-full bg-gray-200 rounded-full h-4 mr-2">
                             <div className="bg-blue-600 h-4 rounded-full" style={{ width: `${Math.min(100, (client.current_month_hours / client.monthly_hours) * 100)}%` }}></div>
                           </div>
-                          <span className="whitespace-nowrap">{client.current_month_hours} / {client.monthly_hours} hrs</span>
+                          <span className="whitespace-nowrap">
+                            {new Intl.NumberFormat('es-CO', {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0
+                            }).format(client.current_month_hours)} / {new Intl.NumberFormat('es-CO', {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0
+                            }).format(client.monthly_hours)} hrs
+                          </span>
                         </div>
                       </td>
                       

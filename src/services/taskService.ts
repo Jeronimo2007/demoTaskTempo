@@ -13,6 +13,8 @@ interface TaskCreatePayload {
   note?: string | null;
   total_value?: number | null;
   due_date?: string | null;
+  permanent: boolean;
+  tarif?: number | null; // Optional float value for permanent task rate
 }
 
 
@@ -25,6 +27,7 @@ interface TaskUpdatePayload {
     billing_type?: 'hourly' | 'percentage' | null;
     note?: string | null;
     total_value?: number | null;
+    tarif?: number | null; // Optional float value for permanent task rate
 }
 export interface AssignedTask {
   task_id: number;
@@ -65,11 +68,24 @@ export const taskService = {
         url,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Map response if necessary, ensure client_id is number, handle potential missing fields
+      console.log("Raw tasks response data:", response.data); // New debug log
+      // Map response to ensure it conforms to Task interface and handle potential missing fields
       return response.data.map(task => ({
-        ...task,
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        due_date: task.due_date,
         client_id: Number(task.client_id), // Ensure client_id is number
-        name: task.title // Keep mapping title to name for compatibility? Review if 'name' is still needed.
+        client_name: task.client_name,
+        billing_type: task.billing_type,
+        area: task.area,
+        note: task.note,
+        total_value: task.total_value,
+        total_billed: task.total_billed,
+        client: task.client,
+        name: task.name, // Or task.title, depending on desired mapping
+        permanent: task.permanent,
+        tarif: task.tarif ?? null // Explicitly include tarif, defaulting to null if not present
       }));
     } catch {
       return [];

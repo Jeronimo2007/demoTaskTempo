@@ -15,6 +15,7 @@ export interface Task {
   client?: string;
   name: string;
   permanent: boolean;
+  tarif?: number | null; // Optional float value for permanent task rate
 }
 
 // Define an AssignedTask interface for task assignments

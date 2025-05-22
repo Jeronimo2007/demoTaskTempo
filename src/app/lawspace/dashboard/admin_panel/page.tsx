@@ -55,6 +55,7 @@ type NewTaskState = {
   total_value: number | null;
   due_date: string;
   permanent: boolean;
+  tarif: number | null; // Add tarif field
 };
 
 
@@ -82,6 +83,7 @@ export default function AdminPanel() {
     total_value: null, // Optional total value, initialize as null
     due_date: "", // Add due_date 
     permanent: false,
+    tarif: null, // Initialize tarif as null
   });
 
   // Pagination states
@@ -136,6 +138,17 @@ export default function AdminPanel() {
       if (!token) return; // Don't fetch if no token
       const fetchedTasks = await taskService.getAllTasks(); // Use the service
       console.log("Tasks fetched via service:", fetchedTasks); // Debug log
+      // Add more detailed logging for permanent tasks
+      fetchedTasks.forEach(task => {
+        if (task.permanent) {
+          console.log(`Permanent task ${task.id}:`, {
+            title: task.title,
+            permanent: task.permanent,
+            tarif: task.tarif
+          });
+        }
+      });
+      console.log("Tasks array before setting state:", fetchedTasks); // New debug log
       setTasks(fetchedTasks);
     } catch (error) {
       console.error("Error al obtener los Asuntos:", error);
@@ -178,6 +191,7 @@ export default function AdminPanel() {
       total_value: null,
       due_date: "", // Add due_date
       permanent: false,
+      tarif: null, // Initialize tarif as null
     });
     setTaskModal({ isOpen: true });
     setUpdateError(null);
@@ -194,6 +208,11 @@ export default function AdminPanel() {
     let processedValue: string | number | null = value;
 
     if (name === 'total_value') {
+      processedValue = value === '' ? null : parseFloat(value);
+      if (isNaN(processedValue as number)) {
+        processedValue = null;
+      }
+    } else if (name === 'tarif') {
       processedValue = value === '' ? null : parseFloat(value);
       if (isNaN(processedValue as number)) {
         processedValue = null;
@@ -232,6 +251,11 @@ export default function AdminPanel() {
     } else if (name === 'due_date') {
       // Keep as string, formatting happens elsewhere if needed
       processedValue = value || undefined; // Use undefined if empty string for optional field
+    } else if (name === 'tarif') {
+      processedValue = value === '' ? null : parseFloat(value);
+      if (isNaN(processedValue as number)) {
+        processedValue = null;
+      }
     }
 
     setEditingTask(prevState => {
@@ -262,6 +286,10 @@ export default function AdminPanel() {
         setUpdateError("El valor total (mayor que 0) es requerido para facturación por porcentaje");
         return;
       }
+      if (newTask.permanent && (newTask.tarif === null || newTask.tarif <= 0)) {
+        setUpdateError("La tarifa es requerida para asuntos permanentes");
+        return;
+      }
 
       let isoDueDate = null;
       if (newTask.due_date) {
@@ -276,11 +304,14 @@ export default function AdminPanel() {
         area: newTask.area || "Sin área",
         note: newTask.note || null,
         total_value: newTask.billing_type === 'percentage' ? newTask.total_value : null,
-        due_date: isoDueDate, // Add due_date in ISO format
+        due_date: isoDueDate,
         permanent: newTask.permanent,
+        tarif: newTask.permanent ? newTask.tarif : null, // Only include tarif if permanent is true
       };
 
-      await taskService.createTask(payload);
+      console.log("Creating task with payload:", payload); // Debug log
+      const createdTask = await taskService.createTask(payload);
+      console.log("Created task:", createdTask); // Debug log
       closeTaskModal();
       fetchTasks();
     } catch (error) {
@@ -306,9 +337,12 @@ export default function AdminPanel() {
       if (editingTask.billing_type === 'percentage' && (editingTask.total_value === null || editingTask.total_value === undefined || editingTask.total_value <= 0)) {
         setUpdateError("El valor total (mayor que 0) es requerido para facturación por porcentaje"); return;
       }
+      if (originalTask.permanent && (editingTask.tarif === null || editingTask.tarif === undefined || editingTask.tarif <= 0)) {
+        setUpdateError("La tarifa es requerida para asuntos permanentes"); return;
+      }
 
       const payload: Partial<Omit<Task, 'id' | 'client_id' | 'client_name' | 'client' | 'name'>> = {};
-      const updatableKeys: (keyof Task)[] = ['title', 'status', 'due_date', 'area', 'billing_type', 'note', 'total_value'];
+      const updatableKeys: (keyof Task)[] = ['title', 'status', 'due_date', 'area', 'billing_type', 'note', 'total_value', 'tarif'];
 
       updatableKeys.forEach(key => {
         if (key in editingTask && editingTask[key] !== originalTask[key]) {
@@ -334,6 +368,10 @@ export default function AdminPanel() {
               payload.total_value = editingTask[key] as number | null;
             } else if (originalTask.total_value !== null) {
               payload.total_value = null;
+            }
+          } else if (key === 'tarif') {
+            if (originalTask.permanent || editingTask.permanent) {
+              payload.tarif = editingTask[key] as number | null;
             }
           }
         }
@@ -455,7 +493,8 @@ export default function AdminPanel() {
                     <th className="border-b border-black p-2 text-left">Cliente</th>
                     <th className="border-b border-black p-2 text-left">Título</th>
                     <th className="border-b border-black p-2 text-left">Fecha Entrega</th>
-                    <th className="border-b border-black p-2 text-left">Asesoria Permanente</th>
+                    <th className="border-b border-black p-2 text-left">Asesoría Permanente</th>
+                    <th className="border-b border-black p-2 text-left">Tarifa</th>
                     <th className="border-b border-black p-2 text-left">Área</th>
                     <th className="border-b border-black p-2 text-left">Facturación</th>
                     <th className="border-b border-black p-2 text-left">Total Facturado</th>
@@ -474,6 +513,19 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-1"><input type="text" name="title" value={editingTask.title || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
                           <td className="border-b border-black p-1"><input type="date" name="due_date" value={formatDate(editingTask.due_date)} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" /></td>
                           <td className="border-b border-black p-1 text-sm">{task.permanent ? "Si" : "No"}</td>
+                          <td className="border-b border-black p-1">
+                            {task.permanent && (
+                              <input 
+                                type="number" 
+                                name="tarif" 
+                                value={editingTask.tarif ?? ''} 
+                                onChange={handleEditingTaskChange} 
+                                className="w-full p-1 border rounded text-black text-sm" 
+                                step="0.01" 
+                                min="0.01" 
+                              />
+                            )}
+                          </td>
                           <td className="border-b border-black p-1">
                             <select name="area" value={editingTask.area || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm">
                               {AREA_OPTIONS.map(area => (<option key={area} value={area}>{area}</option>))}
@@ -511,6 +563,9 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-2 text-sm">{task.title}</td>
                           <td className="border-b border-black p-2 text-sm">{formatDate(task.due_date)}</td>
                           <td className="border-b border-black p-2 text-sm">{task.permanent ? "Si" : "No"}</td>
+                          <td className="border-b border-black p-2 text-sm">
+                            {task.permanent && task.tarif !== null && task.tarif !== undefined ? `$${task.tarif}` : '-'}
+                          </td>
                           <td className="border-b border-black p-2 text-sm">{task.area || 'N/A'}</td>
                           <td className="border-b border-black p-2 text-sm">{task.billing_type === 'hourly' ? `Por Hora` : `Porcentaje (${task.total_value ? task.total_value.toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'N/A'})`}</td>
                           <td className="border-b border-black p-2 text-sm">{task.total_billed ? `$${task.total_billed.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : '-'}</td>
@@ -608,8 +663,21 @@ export default function AdminPanel() {
                   <input type="checkbox" id="permanent" name="permanent" checked={newTask.permanent} onChange={(e: ChangeEvent<HTMLInputElement>) => {
                     setNewTask({ ...newTask, permanent: e.target.checked });
                   }} className="mr-2" />
-                  <label htmlFor="permanent" className="text-black">Permanent</label>
+                  <label htmlFor="permanent" className="text-black">Asesoría Permanente</label>
                 </div>
+                {newTask.permanent && newTask.permanent === true && (
+                  <input
+                    type="number"
+                    name="tarif"
+                    placeholder="Tarifa *"
+                    value={newTask.tarif ?? ''} 
+                    onChange={handleNewTaskChange} 
+                    className="w-full p-2 border rounded mb-2 text-black" 
+                    required={newTask.permanent} 
+                    step="0.01" 
+                    min="0.01" 
+                  />
+                )}
                 <textarea name="note" placeholder="Nota (opcional)" value={newTask.note} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-4 text-black" rows={3} />
                 <div className="flex justify-end gap-2">
                   <button onClick={closeTaskModal} className="px-4 py-2 bg-gray-300 rounded text-black">Cancelar</button>
