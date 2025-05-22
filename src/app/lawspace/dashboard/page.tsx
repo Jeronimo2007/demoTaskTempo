@@ -598,7 +598,7 @@ const TaskTimeEntries = () => {
   const [selectedTask, setSelectedTask] = useState<number | null>(null);
   const [startDate, setStartDate] = useState<Dayjs>(dayjs().subtract(1, 'year'));
   const [endDate, setEndDate] = useState<Dayjs>(dayjs().add(1, 'day'));
-  const [facturado, setFacturado] = useState<"si" | "no" | "parcialmente">("no");
+  const [facturado, setFacturado] = useState<"si" | "no" | "parcialmente" | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
@@ -664,15 +664,19 @@ const TaskTimeEntries = () => {
     try {
       setLoading(true);
       const token = getToken();
-      // Normalize facturado value to remove accents
-      const normalizedFacturado = facturado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      
+      // Normalize facturado value to remove accents only if it's not null
+      const normalizedFacturado = facturado !== null 
+        ? facturado.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        : null; // Send null if 'Todos' is selected
+
       const response = await axios.post(
         `${API_URL}/reports/task_time_entries`,
         {
           task_id: selectedTask,
           start_date: startDate.format("YYYY-MM-DD"),
           end_date: endDate.format("YYYY-MM-DD"),
-          facturado: normalizedFacturado
+          facturado: normalizedFacturado // Use the normalized or null value
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -830,6 +834,7 @@ const TaskTimeEntries = () => {
             value={facturado}
             onChange={setFacturado}
             options={[
+              { value: null, label: 'Todos' },
               { value: 'si', label: 'Sí' },
               { value: 'no', label: 'No' },
               { value: 'parcialmente', label: 'Parcialmente' }
