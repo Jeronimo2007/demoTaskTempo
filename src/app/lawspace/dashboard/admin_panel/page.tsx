@@ -4,17 +4,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 import { useEffect, useState, useCallback, useMemo, ChangeEvent } from "react"; // Add ChangeEvent
 import axios from "axios";
-import InvoiceRegistry from "@/components/facturation/InvoiceRegistry";
-import InvoiceByHoursForm from "@/components/facturation/InvoiceByHoursForm";
-import InvoiceByPercentageForm from "@/components/facturation/InvoiceByPercentageForm";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPlus, faEdit, faRotate } from "@fortawesome/free-solid-svg-icons";
 import ClientSection from "@/components/ClientSection";
 import ReportDownload from "@/components/ReportDownload";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import taskService from "@/services/taskService"; // Import taskService
 import { Task } from "@/types/task"; // Import the updated Task type
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrash, faPlus, faEdit, faRotate } from "@fortawesome/free-solid-svg-icons";
 
 type ClientData = {
   id: number;
@@ -64,15 +60,8 @@ export default function AdminPanel() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   
-  // Simple notification function (replace with toast if needed)
-  const showNotification = (title: string, message: string) => {
-    window.alert(`${title}: ${message}`);
-  };
-
   const [tasks, setTasks] = useState<Task[]>([]); // Use imported Task type
   const [clients, setClients] = useState<ClientData[]>([]);
-  const [loadingClients, setLoadingClients] = useState(false);
-  // Update newTask state to align with TaskCreatePayload and include new fields
   const [newTask, setNewTask] = useState<NewTaskState>({ // Use explicit type
     title: "",
     client_id: "", // Keep as string for form input, convert later
@@ -118,7 +107,6 @@ export default function AdminPanel() {
 
   const fetchClients = useCallback(async () => {
     try {
-      setLoadingClients(true);
       const token = getToken();
       if (!token) return; // Don't fetch if no token
       const response = await axios.get(`${API_URL}/clients/get_clients_admin`, {
@@ -127,8 +115,6 @@ export default function AdminPanel() {
       setClients(response.data);
     } catch (error) {
       console.error("Error al obtener los clientes:", error);
-    } finally {
-      setLoadingClients(false);
     }
   }, [getToken]);
 
@@ -592,44 +578,6 @@ export default function AdminPanel() {
               <button onClick={() => setCurrentTaskPage(prev => Math.min(prev + 1, totalTaskPages))} disabled={currentTaskPage === totalTaskPages || totalTaskPages === 0} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Siguiente</button>
             </div>
           </div>
-
-          {/* Facturation/Invoices Section as Tabs (only for socio) */}
-          {user?.role === "socio" && (
-            <div className="mt-10">
-              <Tabs defaultValue="hours" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="hours">Orden por Horas</TabsTrigger>
-                  <TabsTrigger value="percentage">Orden por Porcentaje</TabsTrigger>
-                  <TabsTrigger value="registry">Registro de Ordenes</TabsTrigger>
-                </TabsList>
-                <TabsContent value="hours">
-                  <InvoiceByHoursForm
-                    clients={clients}
-                    loadingClients={loadingClients}
-                    token={getToken()}
-                    API_URL={API_URL ?? ""}
-                    showNotification={showNotification}
-                  />
-                </TabsContent>
-                <TabsContent value="percentage">
-                  <InvoiceByPercentageForm
-                    clients={clients}
-                    loadingClients={loadingClients}
-                    token={getToken()}
-                    API_URL={API_URL ?? ""}
-                    showNotification={showNotification}
-                  />
-                </TabsContent>
-                <TabsContent value="registry">
-                  <InvoiceRegistry
-                    token={getToken()}
-                    apiUrl={API_URL ?? ""}
-                    showNotification={showNotification}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
 
           <ReportDownload clients={clients} />
 

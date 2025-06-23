@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Table, Modal, Form, Input, Space, Popconfirm, message, Switch, Select } from 'antd';
 import { FaPlus, FaEdit, FaTrash, FaUser } from 'react-icons/fa';
 import axios from 'axios';
@@ -64,13 +64,7 @@ const UserCrudPage: React.FC = () => {
   };
 
   // Fetch users on component mount
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchUsers();
-    }
-  }, [isAuthenticated]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const token = getToken();
@@ -87,7 +81,13 @@ const UserCrudPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken, logout]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUsers();
+    }
+  }, [isAuthenticated, fetchUsers]);
 
   const handleCreate = async (values: UserCreate) => {
     try {
