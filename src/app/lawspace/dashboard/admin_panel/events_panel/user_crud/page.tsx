@@ -38,6 +38,14 @@ interface User extends Omit<UserCreate, 'password'> {
   id: number;
 }
 
+// Move getToken OUTSIDE the component for stable reference
+const getToken = (): string => {
+  return document.cookie
+    .split('; ')
+    .find((row) => row.startsWith('token='))
+    ?.split('=')[1] || '';
+};
+
 const UserCrudPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,22 +63,17 @@ const UserCrudPage: React.FC = () => {
     { value: 'auxiliar', label: 'Auxiliar' },
   ];
 
-  // Get token from cookies
-  const getToken = (): string => {
-    return document.cookie
-      .split('; ')
-      .find((row) => row.startsWith('token='))
-      ?.split('=')[1] || '';
-  };
-
   // Fetch users on component mount
   const fetchUsers = useCallback(async () => {
     try {
+      console.log('fetchUsers: started');
       setLoading(true);
       const token = getToken();
+      console.log('fetchUsers: token', token);
       const response = await axios.get(`${API_URL}/user_crud/get_all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('fetchUsers: response.data', response.data);
       setUsers(response.data);
     } catch (err) {
       message.error('Error al cargar los usuarios');
@@ -80,8 +83,9 @@ const UserCrudPage: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      console.log('fetchUsers: finished, loading set to false');
     }
-  }, [getToken, logout]);
+  }, [logout]);
 
   useEffect(() => {
     if (isAuthenticated) {
