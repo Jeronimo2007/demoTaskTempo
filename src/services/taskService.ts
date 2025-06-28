@@ -75,6 +75,7 @@ export const taskService = {
         title: task.title,
         status: task.status,
         due_date: task.due_date,
+        assignment_date: task.assignment_date,
         client_id: Number(task.client_id), // Ensure client_id is number
         client_name: task.client_name,
         billing_type: task.billing_type,

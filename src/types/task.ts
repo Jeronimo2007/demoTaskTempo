@@ -4,6 +4,7 @@ export interface Task {
   title: string;
   status: string;
   due_date?: string; // Optional in TaskUpdate
+  assignment_date?: string; // Optional assignment date
   client_id: number; // Required in TaskCreate
   client_name?: string; // Optional display field
   billing_type?: 'hourly' | 'percentage'; // Optional in TaskUpdate, required in TaskCreate

@@ -22,7 +22,6 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
   const [taskTabClientId, setTaskTabClientId] = useState('');
   const [taskTabAvailableTasks, setTaskTabAvailableTasks] = useState<{ id: number; title: string }[]>([]);
   const [taskTabLoadingTasks, setTaskTabLoadingTasks] = useState(false);
-  const [valuePerSetHours, setValuePerSetHours] = useState<string>("");
 
   // Move useEffect to top level
   React.useEffect(() => {
@@ -104,12 +103,10 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
     }
     const formattedStartDate = startDate.toISOString();
     const formattedEndDate = endDate.toISOString();
-    const value_per_set_hours = valuePerSetHours === '' ? 0 : parseFloat(valuePerSetHours);
     downloadReport('/reports/download_task_report', {
       task_id: Number(selectedTaskId),
       start_date: formattedStartDate,
       end_date: formattedEndDate,
-      value_per_set_hours,
     });
   };
 
@@ -267,18 +264,6 @@ const ReportDownload: React.FC<ReportDownloadProps> = ({ clients }) => {
                   endDate={endDate}
                   minDate={startDate}
                   className="border p-2 rounded"
-                />
-              </div>
-              <div className="flex flex-col mb-2 w-full max-w-xs">
-                <label className="mb-1 text-base font-semibold text-black">Valor por paquete horas</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={valuePerSetHours}
-                  onChange={e => setValuePerSetHours(e.target.value)}
-                  className="border p-3 text-black rounded text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Dejar vacio si es un asunto de no Asesoria Permanente"
                 />
               </div>
             </div>
