@@ -66,7 +66,6 @@ type ClientFormData = {
   name: string;
   lawyers: number[];
   permanent: boolean;
-  monthly_limit_hours: string;
   nit: string;
   phone: string;
   city: string;
@@ -92,7 +91,6 @@ const initialClientFormState: ClientFormData = {
   name: "",
   lawyers: [],
   permanent: false,
-  monthly_limit_hours: "",
   nit: "",
   phone: "",
   city: "",
@@ -220,12 +218,6 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     }
   }, [onClientUpdate]);
 
-  const parseMonthlyLimitHours = (value: string | undefined): number => {
-    if (!value || value.trim() === '') return 0;
-    const parsed = parseFloat(value);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
   const openCreateClientModal = () => {
     setClientForm(initialClientFormState);
     setClientModal({
@@ -243,7 +235,6 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
       name: client.name,
       lawyers: lawyerIds,
       permanent: client.permanent,
-      monthly_limit_hours: client.monthly_limit_hours !== undefined ? client.monthly_limit_hours.toString() : "",
       nit: client.nit || "",
       phone: client.phone || "",
       city: client.city || "",
@@ -274,22 +265,14 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
         setError("El nombre del cliente no puede estar vacío");
         return;
       }
-
-      const monthlyLimitHours = parseMonthlyLimitHours(clientForm.monthly_limit_hours);
-
-      if (clientForm.permanent && monthlyLimitHours <= 0) {
-        setError("Para clientes de asesoría permanente, debe especificar un límite mensual de horas mayor a 0");
-        return;
-      }
-
       const token = getToken();
       await axios.post(
         `${API_URL}/clients/create`,
-        { 
+        {
           name: clientForm.name,
           lawyers: clientForm.lawyers,
           permanent: clientForm.permanent,
-          monthly_limit_hours: clientForm.permanent ? monthlyLimitHours : 0,
+          monthly_limit_hours: 0,
           nit: clientForm.nit,
           phone: clientForm.phone,
           city: clientForm.city,
@@ -298,7 +281,6 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
       closeClientModal();
       await fetchClients();
       await fetchClientUserRelationships();
@@ -315,45 +297,34 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
 
   const handleUpdateClient = async () => {
     if (!clientModal.clientId) return;
-
     try {
       if (!clientForm.name.trim()) {
         setError("El nombre del cliente no puede estar vacío");
         return;
       }
-
-      const monthlyLimitHours = parseMonthlyLimitHours(clientForm.monthly_limit_hours);
-
-      if (clientForm.permanent && monthlyLimitHours <= 0) {
-        setError("Para clientes de asesoría permanente, debe especificar un límite mensual de horas mayor a 0");
-        return;
-      }
-
       const token = getToken();
       const updateData = {
         id: clientModal.clientId,
         name: clientForm.name,
         lawyers: clientForm.lawyers || [],
         permanent: clientForm.permanent,
-        monthly_limit_hours: clientForm.permanent ? monthlyLimitHours : 0,
+        monthly_limit_hours: 0,
         nit: clientForm.nit,
         phone: clientForm.phone,
         city: clientForm.city,
         address: clientForm.address,
         email: clientForm.email
       };
-
       await axios.put(
         `${API_URL}/clients/update_client`,
         updateData,
-        { 
-          headers: { 
+        {
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
-          } 
+          }
         }
       );
-
       closeClientModal();
       await fetchClients();
       await fetchClientUserRelationships();
@@ -519,7 +490,6 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                   {/* Removed NIT and Contacto headers */}
                   <th className="border-b border-black p-2 text-left">Abogados Asignados</th>
                   <th className="border-b border-black p-2 text-left">Asesoría Permanente</th>
-                  <th className="border-b border-black p-2 text-left">Límite Mensual (Horas)</th>
                   <th className="p-2 text-left">Acciones</th>
                 </tr>
               </thead>
@@ -560,13 +530,6 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                         }`}>
                           {client.permanent ? "Sí" : "No"}
                         </div>
-                      </td>
-                      <td className="border-b border-black p-2">
-                        <span>
-                          {client.permanent ?
-                            (client.monthly_limit_hours ? `${client.monthly_limit_hours} horas` : "No especificado") :
-                            "N/A"}
-                        </span>
                       </td>
                       <td className="p-2 flex space-x-2">
                         {/* Stop propagation to prevent row click when clicking buttons */}
@@ -716,25 +679,6 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                       />
                     </div>
                     
-                    {clientForm.permanent && (
-                      <div>
-                        <label htmlFor="monthly_limit_hours" className="block text-sm font-medium mb-1">
-                          Límite Mensual de Horas*:
-                        </label>
-                        <input
-                          id="monthly_limit_hours"
-                          name="monthly_limit_hours"
-                          type="text"
-                          value={clientForm.monthly_limit_hours}
-                          onChange={handleInputChange}
-                          className="border p-2 text-black rounded w-full"
-                          placeholder="Ej: 10.5"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Ingrese el número de horas mensuales contratadas
-                        </p>
-                      </div>
-                    )}
                   </div>
                   
                   <div className="space-y-4">
