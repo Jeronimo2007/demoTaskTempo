@@ -3,7 +3,7 @@ import { Table, Collapse, Select, DatePicker as AntDatePicker } from "antd";
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import "react-datepicker/dist/react-datepicker.css";
@@ -601,6 +601,9 @@ const TaskTimeEntries = () => {
   const [facturado, setFacturado] = useState<"si" | "no" | "parcialmente" | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+  // --- New state for client search ---
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
 
   const getToken = useCallback(() => {
     const localToken = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -773,25 +776,69 @@ const TaskTimeEntries = () => {
     return new Date(b.fecha_trabajo).getTime() - new Date(a.fecha_trabajo).getTime();
   });
 
+  // --- Filtered clients for search ---
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients;
+    const search = clientSearch.toLowerCase();
+    return clients.filter(c => c.name.toLowerCase().includes(search));
+  }, [clients, clientSearch]);
+
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
       <h2 className="text-lg font-semibold mb-4">Registro de Tiempo por Asunto</h2>
-      
       <div className="flex gap-4 mb-4">
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <label className="block text-sm font-medium text-black mb-1">Cliente</label>
-          <Select
-            className="w-full"
-            placeholder="Seleccione un cliente"
-            value={selectedClient}
-            onChange={setSelectedClient}
-            options={clients.map(client => ({
-              value: client.id,
-              label: client.name
-            }))}
+          {/* Search input for client */}
+          <input
+            type="text"
+            className="w-full p-2 border rounded text-black"
+            placeholder="Buscar Cliente..."
+            value={selectedClient ? clients.find(c => c.id === selectedClient)?.name || "" : clientSearch}
+            onChange={e => {
+              setClientSearch(e.target.value);
+              setSelectedClient(null);
+              setShowClientDropdown(true);
+            }}
+            onFocus={() => setShowClientDropdown(true)}
+            autoComplete="off"
+            disabled={clients.length === 0}
           />
+          {/* Dropdown list of filtered clients */}
+          {showClientDropdown && !selectedClient && filteredClients.length > 0 && (
+            <ul className="absolute z-10 bg-white border w-full max-h-48 overflow-y-auto shadow-lg mt-1 rounded">
+              {filteredClients.map(client => (
+                <li
+                  key={client.id}
+                  className="px-4 py-2 hover:bg-blue-100 cursor-pointer text-black"
+                  onMouseDown={() => {
+                    setSelectedClient(client.id);
+                    setClientSearch("");
+                    setShowClientDropdown(false);
+                  }}
+                >
+                  {client.name}
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* Show clear button if a client is selected */}
+          {selectedClient && (
+            <button
+              type="button"
+              className="absolute right-2 top-8 text-gray-400 hover:text-gray-600"
+              onClick={() => {
+                setSelectedClient(null);
+                setClientSearch("");
+                setShowClientDropdown(true);
+              }}
+              title="Limpiar selección"
+            >
+              ×
+            </button>
+          )}
         </div>
-
+        {/* Task selector remains unchanged */}
         <div className="flex-1">
           <label className="block text-sm font-medium text-black mb-1">Asunto</label>
           <Select

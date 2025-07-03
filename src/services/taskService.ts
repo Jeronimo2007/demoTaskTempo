@@ -7,7 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 interface TaskCreatePayload {
   client_id: number;
   title: string;
-  billing_type: 'hourly' | 'percentage';
+  billing_type: 'hourly' | 'percentage' | 'mensual' | 'fija';
   status: string;
   area?: string | null;
   note?: string | null;
@@ -24,7 +24,7 @@ interface TaskUpdatePayload {
     title?: string | null;
     status?: string | null;
     area?: string | null;
-    billing_type?: 'hourly' | 'percentage' | null;
+    billing_type?: 'hourly' | 'percentage' | 'mensual' | 'fija' | null;
     note?: string | null;
     total_value?: number | null;
     tarif?: number | null; // Optional float value for permanent task rate

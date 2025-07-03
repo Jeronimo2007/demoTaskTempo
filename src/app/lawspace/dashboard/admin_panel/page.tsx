@@ -30,12 +30,18 @@ const TASK_STATUSES = [
 
 // Define area options
 const AREA_OPTIONS = [
-  "Sin área", // Add default option
-  "Laboral",
-  "Comercial/Civil",
+  "Sin área",
   "Propiedad Intelectual",
-  "Societario",
-  "Administrativo"
+  "Administrativo",
+  // New/normalized areas (no duplicates)
+  "Derecho Comercial",
+  "Derecho Societario",
+  "Derecho Laboral",
+  "Cumplimiento",
+  "Derecho Digital",
+  "Derecho Cannábico",
+  "Derecho Inmobiliario",
+  "Derecho Urbanístico"
 ];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -46,7 +52,7 @@ type NewTaskState = {
   title: string;
   client_id: string; // Keep as string for form input
   status: string;
-  billing_type: 'hourly' | 'percentage';
+  billing_type: 'hourly' | 'percentage' | 'mensual' | 'fija';
   area: string;
   note: string;
   total_value: number | null;
@@ -654,6 +660,8 @@ export default function AdminPanel() {
                             <select name="billing_type" value={editingTask.billing_type || 'hourly'} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm">
                               <option value="hourly">Por Hora</option>
                               <option value="percentage">Por Porcentaje</option>
+                              <option value="mensual">Mensual</option>
+                              <option value="fija">Fija</option>
                             </select>
                             {editingTask.billing_type === 'percentage' && (
                               <input type="number" name="total_value" placeholder="Valor Total" value={editingTask.total_value ?? ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black mt-1 text-sm" step="0.01" />
@@ -774,6 +782,8 @@ export default function AdminPanel() {
                   <option value="">Selecciona una opción</option>
                   <option value="percentage">Por Porcentaje</option>
                   <option value="hourly">Por Hora</option>
+                  <option value="mensual">Mensual</option>
+                  <option value="fija">Fija</option>
                 </select>
                 {newTask.billing_type === 'percentage' && (
                   <input type="number" name="total_value" placeholder="Valor Total *" value={newTask.total_value ?? ''} onChange={handleNewTaskChange} className="w-full p-2 border rounded mb-2 text-black" required={newTask.billing_type === 'percentage'} step="0.01" min="0.01" />

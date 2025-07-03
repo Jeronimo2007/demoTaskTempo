@@ -7,7 +7,7 @@ export interface Task {
   assignment_date?: string; // Optional assignment date
   client_id: number; // Required in TaskCreate
   client_name?: string; // Optional display field
-  billing_type?: 'hourly' | 'percentage'; // Optional in TaskUpdate, required in TaskCreate
+  billing_type?: 'hourly' | 'percentage' | 'mensual' | 'fija'; // Optional in TaskUpdate, required in TaskCreate
   area?: string | null; // Optional
   note?: string | null; // Optional
   total_value?: number | null; // Optional
