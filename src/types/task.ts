@@ -17,6 +17,7 @@ export interface Task {
   name: string;
   permanent: boolean;
   tarif?: number | null; // Optional float value for permanent task rate
+  facturado?: string; // Estado de facturación: 'si', 'no', 'parcialmente'
 }
 
 // Define an AssignedTask interface for task assignments

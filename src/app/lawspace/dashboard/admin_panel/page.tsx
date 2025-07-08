@@ -40,6 +40,12 @@ const AREA_OPTIONS = [
   "Derecho Inmobiliario y Urbanístico",
 ];
 
+const FACTURADO_OPTIONS = [
+  { label: 'Si', value: 'si' },
+  { label: 'No', value: 'no' },
+  { label: 'Parcialmente', value: 'parcialmente' },
+];
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 
@@ -55,6 +61,8 @@ type NewTaskState = {
   due_date: string;
   permanent: boolean;
   tarif: number | null; // Add tarif field
+  // Add facturado for clarity, but always send as 'no' on creation
+  facturado?: string;
 };
 
 
@@ -76,6 +84,7 @@ export default function AdminPanel() {
     due_date: "", // Add due_date 
     permanent: false,
     tarif: null, // Initialize tarif as null
+    facturado: 'no', // Initialize facturado as 'no'
   });
 
   // Pagination states
@@ -199,6 +208,7 @@ export default function AdminPanel() {
       due_date: "", // Add due_date
       permanent: false,
       tarif: null, // Initialize tarif as null
+      facturado: 'no', // Initialize facturado as 'no'
     });
     setTaskModal({ isOpen: true });
     setUpdateError(null);
@@ -306,6 +316,7 @@ export default function AdminPanel() {
         due_date: isoDueDate,
         permanent: newTask.permanent,
         tarif: newTask.permanent ? newTask.tarif : null, // Only include tarif if permanent is true
+        facturado: 'no', // Always send as 'no' on creation
       };
 
       console.log("Creating task with payload:", payload); // Debug log
@@ -338,7 +349,7 @@ export default function AdminPanel() {
       }
 
       const payload: Partial<Omit<Task, 'id' | 'client_id' | 'client_name' | 'client' | 'name'>> = {};
-      const updatableKeys: (keyof Task)[] = ['title', 'area', 'billing_type', 'note', 'total_value'];
+      const updatableKeys: (keyof Task)[] = ['title', 'area', 'billing_type', 'note', 'total_value', 'facturado'];
 
       updatableKeys.forEach(key => {
         if (key in editingTask && editingTask[key] !== originalTask[key]) {
@@ -361,6 +372,9 @@ export default function AdminPanel() {
             } else if (originalTask.total_value !== null) {
               payload.total_value = null;
             }
+          } else if (key === 'facturado') {
+            // Always send lowercase value
+            payload.facturado = (editingTask[key] as string)?.toLowerCase();
           }
         }
       });
@@ -634,6 +648,7 @@ export default function AdminPanel() {
                     <th className="border-b border-black p-2 text-left">Área</th>
                     <th className="border-b border-black p-2 text-left">Facturación</th>
                     <th className="border-b border-black p-2 text-left">Nota</th>
+                    <th className="border-b border-black p-2 text-left">Facturado</th>
                     <th className="p-2 text-left">Acciones</th>
                   </tr>
                 </thead>
@@ -665,6 +680,18 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-1">
                             <textarea name="note" placeholder="Nota" value={editingTask.note || ''} onChange={handleEditingTaskChange} className="w-full p-1 border rounded text-black text-sm" rows={1} />
                           </td>
+                          <td className="border-b border-black p-1">
+                            <select
+                              name="facturado"
+                              value={editingTask.facturado || 'no'}
+                              onChange={handleEditingTaskChange}
+                              className="w-full p-1 border rounded text-black text-sm"
+                            >
+                              {FACTURADO_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </td>
                           <td className="p-1">
                             <div className="flex gap-2">
                               <button onClick={handleUpdateTask} className="text-green-600 hover:text-green-800 text-sm">Guardar</button>
@@ -682,6 +709,11 @@ export default function AdminPanel() {
                           <td className="border-b border-black p-2 text-sm">{task.area || 'N/A'}</td>
                           <td className="border-b border-black p-2 text-sm">{task.billing_type === 'hourly' ? `Por Hora` : `Porcentaje (${task.total_value ? task.total_value.toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'N/A'})`}</td>
                           <td className="border-b border-black p-2 text-sm">{task.note || '-'}</td>
+                          <td className="border-b border-black p-2 text-sm">
+                            {task.facturado ?
+                              (task.facturado === 'si' ? 'Si' : task.facturado === 'parcialmente' ? 'Parcialmente' : 'No')
+                              : 'No'}
+                          </td>
                           <td className="p-2">
                             <div className="flex gap-2">
                               <button onClick={() => startEditingTask(task)} className="text-blue-600 hover:text-blue-800" title="Editar"><FontAwesomeIcon icon={faEdit} /></button>

@@ -15,6 +15,7 @@ interface TaskCreatePayload {
   due_date?: string | null;
   permanent: boolean;
   tarif?: number | null; // Optional float value for permanent task rate
+  facturado?: string; // Estado de facturación: 'si', 'no', 'parcialmente'
 }
 
 
@@ -28,6 +29,7 @@ interface TaskUpdatePayload {
     note?: string | null;
     total_value?: number | null;
     tarif?: number | null; // Optional float value for permanent task rate
+    facturado?: string; // Estado de facturación: 'si', 'no', 'parcialmente'
 }
 export interface AssignedTask {
   task_id: number;
@@ -86,7 +88,8 @@ export const taskService = {
         client: task.client,
         name: task.name, // Or task.title, depending on desired mapping
         permanent: task.permanent,
-        tarif: task.tarif ?? null // Explicitly include tarif, defaulting to null if not present
+        tarif: task.tarif ?? null, // Explicitly include tarif, defaulting to null if not present
+        facturado: task.facturado ?? 'no', // Always include facturado, default to 'no' if missing
       }));
     } catch {
       return [];
