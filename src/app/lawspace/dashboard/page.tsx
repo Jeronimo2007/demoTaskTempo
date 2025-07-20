@@ -664,6 +664,14 @@ const TaskTimeEntries = () => {
     setSelectedTask(null);
   }, [selectedClient]);
 
+  type TimeEntryPayload = {
+    task_id: number;
+    start_date: string;
+    end_date: string;
+    facturado: string | null;
+    hour_package?: number;
+  };
+
   const fetchTimeEntries = useCallback(async () => {
     if (!selectedTask) return;
     
@@ -677,15 +685,20 @@ const TaskTimeEntries = () => {
         : null; // Send null if 'Todos' is selected
 
       // Build payload and include hour_package only if provided
-      const payload: any = {
-        task_id: selectedTask,
-        start_date: startDate.format("YYYY-MM-DD"),
-        end_date: endDate.format("YYYY-MM-DD"),
-        facturado: normalizedFacturado
-      };
-      if (hourPackage !== null && !isNaN(hourPackage)) {
-        payload.hour_package = hourPackage;
-      }
+      const payload: TimeEntryPayload = hourPackage !== null && !isNaN(hourPackage)
+        ? {
+            task_id: selectedTask,
+            start_date: startDate.format("YYYY-MM-DD"),
+            end_date: endDate.format("YYYY-MM-DD"),
+            facturado: normalizedFacturado,
+            hour_package: hourPackage
+          }
+        : {
+            task_id: selectedTask,
+            start_date: startDate.format("YYYY-MM-DD"),
+            end_date: endDate.format("YYYY-MM-DD"),
+            facturado: normalizedFacturado
+          };
 
       const response = await axios.post(
         `${API_URL}/reports/task_time_entries`,
