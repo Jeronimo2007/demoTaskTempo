@@ -14,6 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <head>
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
+      </head>
       <body style={{ fontFamily: 'Arial, sans-serif' }}>
         <AuthProvider>
           {children}

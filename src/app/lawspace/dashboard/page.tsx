@@ -559,6 +559,7 @@ interface Task {
 }
 
 interface TaskTimeEntry {
+  id: number; // Unique identifier for the time entry
   abogado: string;
   cargo: string;
   cliente: string;
@@ -604,6 +605,8 @@ const TaskTimeEntries = () => {
   // --- New state for client search ---
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  // --- New state for hour_package ---
+  const [hourPackage, setHourPackage] = useState<number | null>(null);
 
   const getToken = useCallback(() => {
     const localToken = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -673,14 +676,20 @@ const TaskTimeEntries = () => {
         ? facturado.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         : null; // Send null if 'Todos' is selected
 
+      // Build payload and include hour_package only if provided
+      const payload: any = {
+        task_id: selectedTask,
+        start_date: startDate.format("YYYY-MM-DD"),
+        end_date: endDate.format("YYYY-MM-DD"),
+        facturado: normalizedFacturado
+      };
+      if (hourPackage !== null && !isNaN(hourPackage)) {
+        payload.hour_package = hourPackage;
+      }
+
       const response = await axios.post(
         `${API_URL}/reports/task_time_entries`,
-        {
-          task_id: selectedTask,
-          start_date: startDate.format("YYYY-MM-DD"),
-          end_date: endDate.format("YYYY-MM-DD"),
-          facturado: normalizedFacturado // Use the normalized or null value
-        },
+        payload,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -692,7 +701,7 @@ const TaskTimeEntries = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedTask, startDate, endDate, facturado, getToken]);
+  }, [selectedTask, startDate, endDate, facturado, getToken, hourPackage]);
 
   useEffect(() => {
     if (selectedTask) {
@@ -701,6 +710,32 @@ const TaskTimeEntries = () => {
       setTimeEntries([]);
     }
   }, [selectedTask, fetchTimeEntries]);
+
+  // Handler to update facturado
+  const handleFacturadoChange = async (timeEntryId: number, newFacturado: "si" | "no" | "parcialmente") => {
+    try {
+      const token = getToken();
+      await axios.put(
+        `${API_URL}/timeEntry/update/update_facturado`,
+        {
+          timeEntry_id: timeEntryId,
+          facturado: newFacturado,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      // Update local state
+      setTimeEntries(prevEntries =>
+        prevEntries.map(entry =>
+          entry.id === timeEntryId ? { ...entry, facturado: newFacturado } : entry
+        )
+      );
+    } catch (error) {
+      console.error("Error updating facturado:", error);
+      // Optionally show an error message to the user
+    }
+  };
 
   const columns = [
     {
@@ -767,7 +802,18 @@ const TaskTimeEntries = () => {
       title: 'Facturado',
       dataIndex: 'facturado',
       key: 'facturado',
-      render: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+      render: (value: string, record: TaskTimeEntry) => (
+        <Select
+          className="w-full"
+          value={value}
+          onChange={(newValue) => handleFacturadoChange(record.id, newValue as "si" | "no" | "parcialmente")}
+          options={[
+            { value: 'si', label: 'Sí' },
+            { value: 'no', label: 'No' },
+            { value: 'parcialmente', label: 'Parcialmente' }
+          ]}
+        />
+      ),
     },
   ];
 
@@ -853,6 +899,22 @@ const TaskTimeEntries = () => {
             disabled={!selectedClient}
           />
         </div>
+        {/* New input for hour_package */}
+        <div>
+          <label className="block text-sm font-medium text-black mb-1">Horas de Paquete</label>
+          <input
+            type="number"
+            className="w-full p-2 border rounded text-black"
+            placeholder="Horas de paquete"
+            value={hourPackage ?? ""}
+            onChange={e => {
+              const value = e.target.value;
+              setHourPackage(value === "" ? null : parseFloat(value));
+            }}
+            min="0"
+            step="0.01"
+          />
+        </div>
         
         <div>
           <label className="block text-sm font-medium text-black mb-1">Fecha Inicio</label>
@@ -893,7 +955,7 @@ const TaskTimeEntries = () => {
       <Table
         columns={columns}
         dataSource={sortedTimeEntries}
-        rowKey={(record) => `${record.abogado}-${record.fecha_trabajo}-${record.tiempo_trabajado}`}
+        rowKey={(record) => record.id}
         loading={loading}
         pagination={{
           current: currentPage,
