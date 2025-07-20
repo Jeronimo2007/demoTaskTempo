@@ -43,6 +43,8 @@ type ClientData = {
   city?: string;
   address?: string;
   email?: string;
+  international?: boolean;
+  type?: 'natural' | 'juridica';
 };
 
 type UserData = {
@@ -71,6 +73,8 @@ type ClientFormData = {
   city: string;
   address: string;
   email: string;
+  international: boolean;
+  type: 'natural' | 'juridica';
 };
 
 type ClientModalState = {
@@ -95,7 +99,9 @@ const initialClientFormState: ClientFormData = {
   phone: "",
   city: "",
   address: "",
-  email: ""
+  email: "",
+  international: false,
+  type: 'natural',
 };
 
 export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
@@ -239,7 +245,9 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
       phone: client.phone || "",
       city: client.city || "",
       address: client.address || "",
-      email: client.email || ""
+      email: client.email || "",
+      international: client.international ?? false,
+      type: client.type ?? 'natural',
     });
     setClientModal({
       isOpen: true,
@@ -277,7 +285,9 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
           phone: clientForm.phone,
           city: clientForm.city,
           address: clientForm.address,
-          email: clientForm.email
+          email: clientForm.email,
+          international: clientForm.international,
+          type: clientForm.type,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -313,7 +323,9 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
         phone: clientForm.phone,
         city: clientForm.city,
         address: clientForm.address,
-        email: clientForm.email
+        email: clientForm.email,
+        international: clientForm.international,
+        type: clientForm.type,
       };
       await axios.put(
         `${API_URL}/clients/update_client`,
@@ -386,9 +398,15 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setClientForm(prev => ({ ...prev, [name]: value }));
+    if (name === 'international' && e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
+      setClientForm(prev => ({ ...prev, international: (e.target as HTMLInputElement).checked }));
+    } else if (name === 'type') {
+      setClientForm(prev => ({ ...prev, type: value as 'natural' | 'juridica' }));
+    } else {
+      setClientForm(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleLawyerSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -558,6 +576,8 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                               <p><span className="font-semibold">NIT:</span> {client.nit || "-"}</p>
                               <p><span className="font-semibold">Teléfono:</span> {client.phone || "-"}</p>
                               <p><span className="font-semibold">Email:</span> {client.email || "-"}</p>
+                              <p><span className="font-semibold">Internacional:</span> {client.international ? 'Sí' : 'No'}</p>
+                              <p><span className="font-semibold">Tipo:</span> {client.type === 'juridica' ? 'Jurídica' : 'Natural'}</p>
                             </div>
                             <div>
                               <p><span className="font-semibold">Ciudad:</span> {client.city || "-"}</p>
@@ -682,6 +702,36 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
                   </div>
                   
                   <div className="space-y-4">
+                    <div>
+                      <label htmlFor="international" className="block text-sm font-medium mb-1">
+                        Internacional:
+                      </label>
+                      <input
+                        id="international"
+                        name="international"
+                        type="checkbox"
+                        checked={clientForm.international}
+                        onChange={handleInputChange}
+                        className="mr-2"
+                      />
+                      <span>{clientForm.international ? 'Sí' : 'No'}</span>
+                    </div>
+                    <div>
+                      <label htmlFor="type" className="block text-sm font-medium mb-1">
+                        Tipo de Cliente:
+                      </label>
+                      <select
+                        id="type"
+                        name="type"
+                        value={clientForm.type}
+                        onChange={handleInputChange}
+                        className="border p-2 text-black rounded w-full"
+                      >
+                        <option value="natural">Natural</option>
+                        <option value="juridica">Jurídica</option>
+                      </select>
+                    </div>
+                    
                     <div>
                       <label htmlFor="city" className="block text-sm font-medium mb-1">
                         Ciudad:
