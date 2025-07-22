@@ -3,7 +3,7 @@ import { Table, Collapse, Select, DatePicker as AntDatePicker } from "antd";
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import axios from "axios";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import "react-datepicker/dist/react-datepicker.css";
@@ -13,7 +13,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 
-const { Panel } = Collapse;
 
 // Constantes para el manejo de tokens
 const TOKEN_KEY = "token";
@@ -650,7 +649,7 @@ const TaskTimeEntries = () => {
           headers: { Authorization: `Bearer ${token}` },
           params: { client_id: selectedClient }
         });
-        setTasks(response.data);
+        setTasks(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Error fetching tasks:", error);
         setTasks([]);
@@ -842,6 +841,22 @@ const TaskTimeEntries = () => {
     return clients.filter(c => c.name.toLowerCase().includes(search));
   }, [clients, clientSearch]);
 
+  // --- New: Hide table if no tasks for client or no entries for task ---
+  const shouldShowTable = useMemo(() => {
+    // If a client is selected but there are no tasks, hide everything
+    if (selectedClient && tasks.length === 0) return false;
+    // If a task is selected but there are no time entries, hide everything
+    if (selectedTask && timeEntries.length === 0) return false;
+    // If no client is selected, show the search UI
+    if (!selectedClient) return true;
+    // If client has tasks and no task is selected, show the UI
+    if (selectedClient && tasks.length > 0 && !selectedTask) return true;
+    // If client and task are selected and there are entries, show the table
+    if (selectedClient && selectedTask && timeEntries.length > 0) return true;
+    // Default: hide
+    return false;
+  }, [selectedClient, tasks, selectedTask, timeEntries]);
+
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
       <h2 className="text-lg font-semibold mb-4">Registro de Tiempo por Asunto</h2>
@@ -905,7 +920,7 @@ const TaskTimeEntries = () => {
             placeholder="Seleccione un Asunto"
             value={selectedTask}
             onChange={setSelectedTask}
-            options={tasks.map(task => ({
+            options={(Array.isArray(tasks) ? tasks : []).map(task => ({
               value: task.id,
               label: task.title
             }))}
@@ -953,10 +968,10 @@ const TaskTimeEntries = () => {
           <label className="block text-sm font-medium text-black mb-1">Facturado</label>
           <Select
             className="w-full"
-            value={facturado}
-            onChange={setFacturado}
+            value={facturado === null ? "todos" : facturado}
+            onChange={val => setFacturado(val === "todos" ? null : val as "si" | "no" | "parcialmente")}
             options={[
-              { value: null, label: 'Todos' },
+              { value: "todos", label: 'Todos' },
               { value: 'si', label: 'Sí' },
               { value: 'no', label: 'No' },
               { value: 'parcialmente', label: 'Parcialmente' }
@@ -965,19 +980,22 @@ const TaskTimeEntries = () => {
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={sortedTimeEntries}
-        rowKey={(record) => record.id}
-        loading={loading}
-        pagination={{
-          current: currentPage,
-          pageSize: pageSize,
-          total: sortedTimeEntries.length,
-          onChange: (page) => setCurrentPage(page),
-          showSizeChanger: false
-        }}
-      />
+      {/* Only show the table if shouldShowTable is true */}
+      {shouldShowTable && (
+        <Table
+          columns={columns}
+          dataSource={sortedTimeEntries}
+          rowKey={(record) => record.id}
+          loading={loading}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: sortedTimeEntries.length,
+            onChange: (page) => setCurrentPage(page),
+            showSizeChanger: false
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -1000,6 +1018,10 @@ export default function Dashboard() {
   // Add pagination states
   const [currentPermanentPage, setCurrentPermanentPage] = useState(1);
   const itemsPerPage = 5;
+
+  // --- Only fetch client summary when Asesoría Permanente is visible ---
+  const [shouldFetchClientSummary, setShouldFetchClientSummary] = useState(false);
+  const asesoríaPermanenteRef = useRef<HTMLDivElement | null>(null);
 
   // Función mejorada para obtener el token, priorizando localStorage y luego cookies
   const getToken = useCallback(() => {
@@ -1108,6 +1130,19 @@ export default function Dashboard() {
     setCurrentPermanentPage(1);
   }, [permanentSearch]);
 
+  // Only fetch client summary when needed
+  useEffect(() => {
+    if (shouldFetchClientSummary && isAuthenticated && user) {
+      fetchClientSummary();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldFetchClientSummary, isAuthenticated, user]);
+
+  // Trigger fetch when Asesoría Permanente section is about to be rendered
+  useEffect(() => {
+    setShouldFetchClientSummary(true);
+  }, []);
+
   // Simplified initialization effect relying on ProtectedRoute
   useEffect(() => {
     const fetchData = async () => {
@@ -1116,7 +1151,7 @@ export default function Dashboard() {
         // ProtectedRoute ensures we are authenticated and authorized
         await Promise.all([
           fetchReportData(),
-          fetchClientSummary(),
+          // fetchClientSummary(), // This line is removed as per the new_code
         ]);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -1218,7 +1253,7 @@ export default function Dashboard() {
           <TaskTimeEntries />
 
           {/* Asesoría Permanente Section */}
-          <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6">
+          <div className="bg-white p-4 rounded-lg shadow-lg text-black mb-6" ref={asesoríaPermanenteRef}>
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-semibold">Asesoría Permanente - {currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)}</h2>
               <div className="relative w-64">
@@ -1297,20 +1332,31 @@ export default function Dashboard() {
               <h1 className="text-4xl font-bold text-center mb-8 text-black border-b-2 border-blue-200 pb-4">
                 Panel de Rentabilidad
               </h1>
-              <Collapse defaultActiveKey={['1']}>
-                <Panel header="Resumen de Rentabilidad de SSL" key="1">
-                  <OfficeRentabilitySummary />
-                </Panel>
-                <Panel header="Coste por Hora de Abogados mensualmente" key="2">
-                  <LawyersCostVsHours />
-                </Panel>
-                <Panel header="Carga de Abogados por Semana / Mes" key="3">
-                  <LawyersWeeklyWorkload />
-                </Panel>
-                <Panel header="Contribuciones de Clientes" key="4">
-                  <ClientsContributions />
-                </Panel>
-              </Collapse>
+              <Collapse
+                defaultActiveKey={['1']}
+                items={[
+                  {
+                    key: '1',
+                    label: 'Resumen de Rentabilidad de SSL',
+                    children: <OfficeRentabilitySummary />,
+                  },
+                  {
+                    key: '2',
+                    label: 'Coste por Hora de Abogados mensualmente',
+                    children: <LawyersCostVsHours />,
+                  },
+                  {
+                    key: '3',
+                    label: 'Carga de Abogados por Semana / Mes',
+                    children: <LawyersWeeklyWorkload />,
+                  },
+                  {
+                    key: '4',
+                    label: 'Contribuciones de Clientes',
+                    children: <ClientsContributions />,
+                  },
+                ]}
+              />
             </div>
           )}
         </div>
