@@ -38,7 +38,8 @@ const AREA_OPTIONS = [
   "Derecho Digital",
   "Derecho Cannábico",
   "Derecho Inmobiliario y Urbanístico",
-  "Regulatorio"
+  "Regulatorio",
+  "Derecho Judicial",
 ];
 
 const FACTURADO_OPTIONS = [
