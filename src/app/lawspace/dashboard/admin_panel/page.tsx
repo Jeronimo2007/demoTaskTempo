@@ -19,7 +19,7 @@ type ClientData = {
   permanent: boolean;
 };
 
-// Define task status options with their colors
+// define task status option with their colorsss
 const TASK_STATUSES = [
   { value: "En proceso", color: "bg-yellow-500" },
   { value: "Finalizado", color: "bg-green-500" },
