@@ -129,6 +129,7 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
   // Add pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [pageInput, setPageInput] = useState<string>('1');
 
   const getToken = useCallback(() => {
     return document.cookie
@@ -442,6 +443,19 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
     setCurrentPage(1);
   }, [searchTerm]);
 
+  // Keep page input synced with current page
+  useEffect(() => {
+    setPageInput(String(currentPage || 1));
+  }, [currentPage]);
+
+  const handlePageJump = () => {
+    if (totalPages === 0) return;
+    const parsed = parseInt(pageInput, 10);
+    if (isNaN(parsed)) return;
+    const clamped = Math.max(1, Math.min(parsed, totalPages));
+    setCurrentPage(clamped);
+  };
+
   const handleRowClick = (clientId: number) => {
     setExpandedClientId(prevId => (prevId === clientId ? null : clientId));
   };
@@ -602,9 +616,27 @@ export default function ClientSection({ onClientUpdate }: ClientSectionProps) {
             >
               Anterior
             </button>
-            <span className="text-gray-700">
-              Página {currentPage} de {totalPages}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-700">Página {currentPage} de {totalPages}</span>
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, totalPages)}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handlePageJump(); }}
+                disabled={totalPages === 0}
+                className="w-20 p-2 border rounded text-black"
+                placeholder="Ir a..."
+              />
+              <button
+                onClick={handlePageJump}
+                disabled={totalPages === 0}
+                className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+              >
+                Ir
+              </button>
+            </div>
             <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}

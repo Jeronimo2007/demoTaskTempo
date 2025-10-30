@@ -40,6 +40,8 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState<string>('');
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
 
   useEffect(() => {
     // Reset form when modal opens
@@ -50,6 +52,7 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
     setDescription('');
     setFormError(null);
     setFilteredTasks([]);
+    setClientSearchTerm('');
   }, [isOpen, start, end]);
 
   // Fetch clients when modal opens
@@ -57,14 +60,34 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
     if (isOpen) {
       setIsLoadingClients(true);
       clientService.getAllClients()
-        .then(setClients)
+        .then(clientsData => {
+          // Ensure we have an array
+          const validClients = Array.isArray(clientsData) ? clientsData : [];
+          setClients(validClients);
+          setFilteredClients(validClients);
+        })
         .catch(err => {
           console.error('Error fetching clients:', err);
           setFormError('Error al cargar los clientes');
+          setClients([]);
+          setFilteredClients([]);
         })
         .finally(() => setIsLoadingClients(false));
     }
   }, [isOpen]);
+
+  // Filter clients based on search term
+  useEffect(() => {
+    if (!clientSearchTerm.trim()) {
+      setFilteredClients(clients);
+    } else {
+      const searchLower = clientSearchTerm.toLowerCase();
+      const filtered = clients.filter(client =>
+        client.name.toLowerCase().includes(searchLower)
+      );
+      setFilteredClients(filtered);
+    }
+  }, [clientSearchTerm, clients]);
 
   // Update filtered tasks when client selection changes
   useEffect(() => {
@@ -73,7 +96,9 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
         setIsLoadingTasks(true);
         try {
           const clientTasks = await taskService.getTasksByClient(selectedClientId);
-          setFilteredTasks(clientTasks);
+          // Ensure we always have an array
+          const validTasks = Array.isArray(clientTasks) ? clientTasks : [];
+          setFilteredTasks(validTasks);
         } catch (err) {
           console.error('Error fetching client tasks:', err);
           setFormError('Error al cargar las tareas del cliente');
@@ -124,12 +149,6 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
     return moment(date).format('YYYY-MM-DDTHH:mm');
   };
 
-  // Seleccionar cliente
-  const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setSelectedClientId(value ? Number(value) : null);
-  };
-
   // Seleccionar tarea
   const handleTaskSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -175,24 +194,47 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-4">
           <div className="mb-4">
-            <label htmlFor="client" className="block text-sm font-medium text-gray-700 mb-1">
-              Cliente *
+            <label htmlFor="clientSearch" className="block text-sm font-medium text-gray-700 mb-1">
+              Buscar Cliente *
             </label>
-            <select
-              id="client"
-              value={selectedClientId || ''}
-              onChange={handleClientSelect}
+            <input
+              type="text"
+              id="clientSearch"
+              value={clientSearchTerm}
+              onChange={(e) => setClientSearchTerm(e.target.value)}
+              placeholder="Escribe para buscar un cliente..."
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={isCreating || isLoadingClients}
-              required
-            >
-              <option value="">Seleccionar cliente</option>
-              {clients.map(client => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
+            />
+            {clientSearchTerm && filteredClients.length > 0 && (
+              <div className="mt-1 max-h-48 overflow-y-auto border border-gray-300 rounded-md bg-white shadow-lg">
+                {filteredClients.map(client => (
+                  <button
+                    key={client.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedClientId(client.id);
+                      setClientSearchTerm(client.name);
+                    }}
+                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition ${
+                      selectedClientId === client.id ? 'bg-blue-100' : ''
+                    }`}
+                  >
+                    {client.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {clientSearchTerm && filteredClients.length === 0 && !isLoadingClients && (
+              <div className="mt-1 p-2 text-sm text-gray-500 border border-gray-300 rounded-md bg-gray-50">
+                No se encontraron clientes
+              </div>
+            )}
+            {selectedClientId && !clientSearchTerm && (
+              <div className="mt-2 text-sm text-green-600">
+                Cliente seleccionado: {clients.find(c => c.id === selectedClientId)?.name}
+              </div>
+            )}
           </div>
 
           <div className="mb-4">
@@ -208,7 +250,7 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
               required
             >
               <option value="">Seleccionar tarea</option>
-              {filteredTasks.map(task => (
+              {Array.isArray(filteredTasks) && filteredTasks.map(task => (
                 <option key={task.id} value={task.id}>
                   {task.title}
                 </option>
@@ -217,6 +259,11 @@ const TimeEntryModal: React.FC<TimeEntryModalProps> = ({
             {isLoadingTasks && (
               <div className="mt-2 text-sm text-gray-500">
                 Cargando tareas...
+              </div>
+            )}
+            {!isLoadingTasks && selectedClientId && filteredTasks.length === 0 && (
+              <div className="mt-2 text-sm text-amber-600">
+                Este cliente no tiene tareas asignadas.
               </div>
             )}
           </div>

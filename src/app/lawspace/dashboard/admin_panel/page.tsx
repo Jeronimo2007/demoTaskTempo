@@ -11,7 +11,7 @@ import taskService from "@/services/taskService"; // Import taskService
 import { Task } from "@/types/task"; // Import the updated Task type
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash, faPlus, faEdit, faRotate } from "@fortawesome/free-solid-svg-icons";
-import groupService, { Group } from '@/services/groupService';
+ 
 
 type ClientData = {
   id: number;
@@ -92,6 +92,7 @@ export default function AdminPanel() {
   // Pagination states
   const [currentTaskPage, setCurrentTaskPage] = useState(1);
   const itemsPerPage = 5;
+  const [taskPageInput, setTaskPageInput] = useState<string>('1');
 
   // Filter states
   const [clientFilter, setClientFilter] = useState<string>("");
@@ -103,29 +104,7 @@ export default function AdminPanel() {
     isOpen: false
   });
 
-  // --- GROUP STATE ---
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [isGroupLoading, setIsGroupLoading] = useState(false);
-  const [groupError, setGroupError] = useState<string | null>(null);
-  const [groupModal, setGroupModal] = useState<{ isOpen: boolean; isEdit: boolean; groupId?: number }>({ isOpen: false, isEdit: false });
-  const [newGroup, setNewGroup] = useState<{
-    group_name: string;
-    monthly_limit_hours: number | '';
-    client_id: string;
-    tasks: number[];
-  }>({
-    group_name: '',
-    monthly_limit_hours: '',
-    client_id: '',
-    tasks: [],
-  });
-
-  // For editing
-  const [editingGroup, setEditingGroup] = useState<typeof newGroup>(newGroup);
-  
-  // For filtered tasks by client in group modal
-  const [groupFilteredTasks, setGroupFilteredTasks] = useState<Task[]>([]);
-  const [isLoadingGroupTasks, setIsLoadingGroupTasks] = useState(false);
+  // (Removed legacy group management state)
 
   // Get token from cookie
   const getToken = useCallback(() => {
@@ -442,6 +421,19 @@ export default function AdminPanel() {
     setCurrentTaskPage(1);
   };
 
+  // Keep input in sync when current page changes
+  useEffect(() => {
+    setTaskPageInput(String(currentTaskPage || 1));
+  }, [currentTaskPage]);
+
+  const handleTaskPageJump = () => {
+    if (totalTaskPages === 0) return;
+    const parsed = parseInt(taskPageInput, 10);
+    if (isNaN(parsed)) return;
+    const clamped = Math.max(1, Math.min(parsed, totalTaskPages));
+    setCurrentTaskPage(clamped);
+  };
+
   const totalTaskPages = Math.ceil(filteredTasks.length / itemsPerPage);
   const paginatedTasks = filteredTasks.slice((currentTaskPage - 1) * itemsPerPage, currentTaskPage * itemsPerPage);
 
@@ -457,155 +449,7 @@ export default function AdminPanel() {
     }
   };
 
-  // --- GROUP HANDLERS ---
-  const fetchGroups = useCallback(async () => {
-    setIsGroupLoading(true);
-    setGroupError(null);
-    try {
-      const data = await groupService.getAllGroups();
-      setGroups(data);
-    } catch {
-      setGroupError('Error al obtener los grupos.');
-    } finally {
-      setIsGroupLoading(false);
-    }
-  }, []);
-
-  // Update filtered tasks when client selection changes
-  useEffect(() => {
-    const fetchClientTasks = async () => {
-      const currentClientId = groupModal.isEdit ? editingGroup.client_id : newGroup.client_id;
-      if (currentClientId) {
-        setIsLoadingGroupTasks(true);
-        try {
-          const clientTasks = await taskService.getTasksByClient(Number(currentClientId));
-          setGroupFilteredTasks(clientTasks);
-        } catch (err) {
-          console.error('Error fetching client tasks:', err);
-          setGroupError('Error al cargar las tareas del cliente');
-          setGroupFilteredTasks([]);
-        } finally {
-          setIsLoadingGroupTasks(false);
-        }
-      } else {
-        setGroupFilteredTasks([]);
-      }
-    };
-
-    if (groupModal.isOpen) {
-      fetchClientTasks();
-    }
-  }, [groupModal.isOpen, groupModal.isEdit, editingGroup.client_id, newGroup.client_id]);
-
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchGroups();
-    }
-  }, [isAuthenticated, user, fetchGroups]);
-
-  const openGroupModal = (isEdit = false, group?: Group) => {
-    if (isEdit && group && group.id) {
-      // Find client id by matching client name to clients array
-      const clientId = clients.find(c => c.name === group.client_name)?.id?.toString() || '';
-      // Find task ids by matching titles
-      const taskIds = tasks.filter(t => group.tasks.includes(t.title)).map(t => t.id);
-      setEditingGroup({
-        group_name: group.group_name,
-        monthly_limit_hours: group.monthly_limit_hours || '',
-        client_id: clientId,
-        tasks: taskIds,
-      });
-      setGroupModal({ isOpen: true, isEdit: true, groupId: group.id });
-    } else {
-      setNewGroup({ group_name: '', monthly_limit_hours: '', client_id: '', tasks: [] });
-      setGroupModal({ isOpen: true, isEdit: false });
-    }
-    setGroupError(null);
-  };
-
-  const closeGroupModal = () => {
-    setGroupModal({ isOpen: false, isEdit: false });
-    setGroupError(null);
-    setGroupFilteredTasks([]);
-  };
-
-  const handleGroupChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (groupModal.isEdit) {
-      setEditingGroup(prev => ({ 
-        ...prev, 
-        [name]: name === 'monthly_limit_hours' ? (value === '' ? '' : parseInt(value)) : value,
-        // Reset tasks when client changes
-        ...(name === 'client_id' && { tasks: [] })
-      }));
-    } else {
-      setNewGroup(prev => ({ 
-        ...prev, 
-        [name]: name === 'monthly_limit_hours' ? (value === '' ? '' : parseInt(value)) : value,
-        // Reset tasks when client changes
-        ...(name === 'client_id' && { tasks: [] })
-      }));
-    }
-  };
-
-  const handleGroupTasksChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const selected = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-    if (groupModal.isEdit) {
-      setEditingGroup(prev => ({ ...prev, tasks: selected }));
-    } else {
-      setNewGroup(prev => ({ ...prev, tasks: selected }));
-    }
-  };
-
-  const handleCreateGroup = async () => {
-    setGroupError(null);
-    if (!newGroup.group_name.trim()) { setGroupError('El nombre del grupo es obligatorio.'); return; }
-    if (!newGroup.client_id) { setGroupError('Debe seleccionar un cliente.'); return; }
-    if (!newGroup.monthly_limit_hours || newGroup.monthly_limit_hours <= 0) { setGroupError('El límite de horas debe ser mayor a 0.'); return; }
-    if (!newGroup.tasks.length) { setGroupError('Debe seleccionar al menos un asunto.'); return; }
-    try {
-      await groupService.createGroup({
-        group_name: newGroup.group_name,
-        monthly_limit_hours: Number(newGroup.monthly_limit_hours),
-        client_id: Number(newGroup.client_id),
-        tasks: newGroup.tasks,
-      });
-      closeGroupModal();
-      fetchGroups();
-    } catch {
-      setGroupError('Error al crear el grupo.');
-    }
-  };
-
-  const handleUpdateGroup = async () => {
-    if (!groupModal.groupId) return;
-    setGroupError(null);
-    if (!editingGroup.group_name.trim()) { setGroupError('El nombre del grupo es obligatorio.'); return; }
-    if (!editingGroup.monthly_limit_hours || editingGroup.monthly_limit_hours <= 0) { setGroupError('El límite de horas debe ser mayor a 0.'); return; }
-    if (!editingGroup.tasks.length) { setGroupError('Debe seleccionar al menos un asunto.'); return; }
-    try {
-      await groupService.updateGroup(groupModal.groupId, {
-        group_name: editingGroup.group_name,
-        monthly_limit_hours: Number(editingGroup.monthly_limit_hours),
-        tasks: editingGroup.tasks,
-      });
-      closeGroupModal();
-      fetchGroups();
-    } catch {
-      setGroupError('Error al actualizar el grupo.');
-    }
-  };
-
-  const handleDeleteGroup = async (groupId: number) => {
-    if (!window.confirm('¿Está seguro que desea eliminar el grupo?')) return;
-    setGroupError(null);
-    try {
-      await groupService.deleteGroup(groupId);
-      fetchGroups();
-    } catch {
-      setGroupError('Error al eliminar el grupo.');
-    }
-  };
+  // (Removed legacy group handlers)
 
   return (
     <ProtectedRoute allowedRoles={['senior', 'socio', 'consultor']}>
@@ -733,59 +577,29 @@ export default function AdminPanel() {
             {/* Task Pagination */}
             <div className="flex justify-between items-center mt-4">
               <button onClick={() => setCurrentTaskPage(prev => Math.max(prev - 1, 1))} disabled={currentTaskPage === 1} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Anterior</button>
-              <span>Página {currentTaskPage} de {totalTaskPages}</span>
+              <div className="flex items-center gap-2">
+                <span>Página {currentTaskPage} de {totalTaskPages}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, totalTaskPages)}
+                  value={taskPageInput}
+                  onChange={(e) => setTaskPageInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleTaskPageJump(); }}
+                  disabled={totalTaskPages === 0}
+                  className="w-20 p-2 border rounded text-black"
+                  placeholder="Ir a..."
+                />
+                <button
+                  onClick={handleTaskPageJump}
+                  disabled={totalTaskPages === 0}
+                  className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+                >
+                  Ir
+                </button>
+              </div>
               <button onClick={() => setCurrentTaskPage(prev => Math.min(prev + 1, totalTaskPages))} disabled={currentTaskPage === totalTaskPages || totalTaskPages === 0} className="px-4 py-2 bg-gray-300 rounded disabled:opacity-50">Siguiente</button>
             </div>
-          </div>
-
-          {/* --- GESTIÓN DE GRUPOS --- */}
-          <div className="p-6 text-black shadow-lg rounded-lg bg-white mt-10">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Gestión de Grupos</h2>
-              <button onClick={() => openGroupModal(false)} className="flex items-center bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-                <FontAwesomeIcon icon={faPlus} className="mr-2" /> Nuevo Grupo
-              </button>
-            </div>
-            {groupError && (<div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"><p>{groupError}</p></div>)}
-            {isGroupLoading ? (
-              <div className="flex items-center justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div></div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border border-black rounded-lg overflow-hidden shadow-md">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="border-b border-black p-2 text-left">Nombre</th>
-                      <th className="border-b border-black p-2 text-left">Cliente</th>
-                      <th className="border-b border-black p-2 text-left">Límite Mensual (horas)</th>
-                      <th className="border-b border-black p-2 text-left">Asuntos</th>
-                      <th className="p-2 text-left">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groups.map((group, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="border-b border-black p-2 text-sm">{group.group_name}</td>
-                        <td className="border-b border-black p-2 text-sm">{group.client_name || '-'}</td>
-                        <td className="border-b border-black p-2 text-sm">{group.monthly_limit_hours ?? '-'}</td>
-                        <td className="border-b border-black p-2 text-sm">
-                          <ul className="list-disc list-inside">
-                            {group.tasks.map((task, taskIdx) => (
-                              <li key={taskIdx} className="text-xs">{task}</li>
-                            ))}
-                          </ul>
-                        </td>
-                        <td className="p-2">
-                          <div className="flex gap-2">
-                            <button onClick={() => openGroupModal(true, group)} className="text-blue-600 hover:text-blue-800" title="Editar"><FontAwesomeIcon icon={faEdit} /></button>
-                            <button onClick={() => handleDeleteGroup(group.id!)} className="text-red-600 hover:text-red-800" title="Eliminar"><FontAwesomeIcon icon={faTrash} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
 
           <ReportDownload clients={clients} />
@@ -845,42 +659,6 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {/* Group Modal */}
-          {groupModal.isOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-              <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-                <h3 className="text-lg font-semibold mb-4 text-black">{groupModal.isEdit ? 'Editar Grupo' : 'Crear Nuevo Grupo'}</h3>
-                {groupError && <p className="text-red-500 mb-4">{groupError}</p>}
-                <input type="text" name="group_name" placeholder="Nombre del Grupo *" value={groupModal.isEdit ? editingGroup.group_name : newGroup.group_name} onChange={handleGroupChange} className="w-full p-2 border rounded mb-2 text-black" required />
-                <input type="number" name="monthly_limit_hours" placeholder="Límite Mensual de Horas *" value={groupModal.isEdit ? editingGroup.monthly_limit_hours : newGroup.monthly_limit_hours} onChange={handleGroupChange} className="w-full p-2 border rounded mb-2 text-black" required min="1" />
-                {!groupModal.isEdit && (
-                  <select name="client_id" value={groupModal.isEdit ? editingGroup.client_id : newGroup.client_id} onChange={handleGroupChange} className="w-full p-2 border rounded mb-2 text-black" required={!groupModal.isEdit} disabled={groupModal.isEdit}>
-                    <option value="">Seleccionar Cliente *</option>
-                    {clients.map((client: ClientData) => (<option key={client.id} value={client.id}>{client.name}</option>))}
-                  </select>
-                )}
-                <select name="tasks" multiple value={groupModal.isEdit ? editingGroup.tasks.map(String) : newGroup.tasks.map(String)} onChange={handleGroupTasksChange} className="w-full p-2 border rounded mb-4 text-black h-32" required disabled={!((groupModal.isEdit ? editingGroup.client_id : newGroup.client_id) && !isLoadingGroupTasks)}>
-                  <option value="" disabled>Seleccionar asuntos (seleccione un cliente primero)</option>
-                  {groupFilteredTasks.map((task) => (
-                    <option key={task.id} value={task.id}>{task.title}</option>
-                  ))}
-                </select>
-                {isLoadingGroupTasks && (
-                  <div className="mb-4 text-sm text-gray-500">
-                    Cargando asuntos del cliente...
-                  </div>
-                )}
-                <div className="flex justify-end gap-2">
-                  <button onClick={closeGroupModal} className="px-4 py-2 bg-gray-300 rounded text-black">Cancelar</button>
-                  {groupModal.isEdit ? (
-                    <button onClick={handleUpdateGroup} className="px-4 py-2 bg-blue-600 text-white rounded">Actualizar Grupo</button>
-                  ) : (
-                    <button onClick={handleCreateGroup} className="px-4 py-2 bg-blue-600 text-white rounded">Crear Grupo</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </ProtectedRoute>
